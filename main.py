@@ -47,7 +47,7 @@ from src.components.ui import Button, Input, Label, TextArea, Checkbox
 from src.components.layout import Card, Section, Row, Column
 from src.components.theme import T
 from src.components.hooks import use_tk_state
-from src.controllers import SourceController
+from src.controllers import SourceController, SubtitleController, TtsController
 from src.utils.file_utils import is_local_file
 from src.utils.runtime_env import ensure_local_runtime_env
 
@@ -2489,6 +2489,20 @@ def launch_gui():
     for i, btn in enumerate(step_btn_widgets):
         step_num = i + 1
         btn.config(command=lambda n=step_num: source_ctrl.on_step_clicked(n))
+
+    # Create SubtitleController and TtsController
+    subtitle_ctrl = SubtitleController(
+        on_cover_mode_changed_fn=None,  # Cover mode handled by state binding
+        on_preset_changed_fn=apply_selected_preset,
+        on_param_changed_fn=None  # Params handled by state bindings
+    )
+
+    tts_ctrl = TtsController(
+        on_dub_mode_changed_fn=sync_dub_mode,
+        on_voice_changed_fn=None,  # Voice handled by state binding
+        play_tts_preview_fn=play_tts_preview,
+        stop_preview_audio_fn=stop_preview_audio
+    )
 
     root.mainloop()
 
