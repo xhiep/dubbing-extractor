@@ -47,7 +47,7 @@ from src.components.ui import Button, Input, Label, TextArea, Checkbox
 from src.components.layout import Card, Section, Row, Column
 from src.components.theme import T
 from src.components.hooks import use_tk_state
-from src.controllers import SourceController, SubtitleController, TtsController
+from src.controllers import SourceController, SubtitleController, TtsController, AppController
 from src.utils.file_utils import is_local_file
 from src.utils.runtime_env import ensure_local_runtime_env
 
@@ -2502,6 +2502,12 @@ def launch_gui():
         on_voice_changed_fn=None,  # Voice handled by state binding
         play_tts_preview_fn=play_tts_preview,
         stop_preview_audio_fn=stop_preview_audio
+    )
+
+    # Create AppController
+    app_ctrl = AppController(
+        save_config_fn=save_app_config,
+        load_config_fn=load_app_config
     )
 
     root.mainloop()

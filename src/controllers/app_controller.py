@@ -1,44 +1,56 @@
 """App Controller - Application-level event handlers.
 
 Handles:
-- Config save/load
+- Config save/load (delegated to src.config)
 - Window close
 - Tab switching
 - Cross-controller coordination
+
+Note: Thin wrapper pattern. Most app-level functions already
+exist in src.config module, so this controller is mainly a
+placeholder for future app-level coordination logic.
 """
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Callable
 
 
 class AppController:
-    """Application-level controller."""
+    """Application-level controller - thin wrapper pattern."""
 
-    def __init__(self, widgets: Dict[str, Any], config: Dict[str, Any]):
+    def __init__(self,
+                 save_config_fn: Callable = None,
+                 load_config_fn: Callable = None):
         """Initialize app controller.
 
         Args:
-            widgets: Dict of widget references
-                Required keys: TBD (will be determined during extraction)
-            config: Global config dict
+            save_config_fn: Config save function
+            load_config_fn: Config load function
         """
-        self.widgets = widgets
-        self.config = config
+        self.save_config_fn = save_config_fn
+        self.load_config_fn = load_config_fn
 
-    def on_config_save(self):
-        """Handle config save request."""
-        # TODO: Extract from main.py
-        pass
+    def on_config_save(self, config_dict: Dict[str, Any]):
+        """Handle config save request.
 
-    def on_config_load(self):
-        """Handle config load request."""
-        # TODO: Extract from main.py
-        pass
+        Args:
+            config_dict: Configuration dictionary to save
+        """
+        if self.save_config_fn:
+            self.save_config_fn(config_dict)
+
+    def on_config_load(self) -> Dict[str, Any]:
+        """Handle config load request.
+
+        Returns:
+            Loaded configuration dictionary
+        """
+        if self.load_config_fn:
+            return self.load_config_fn()
+        return {}
 
     def on_window_close(self):
-        """Handle window close event."""
-        # TODO: Extract from main.py
-        pass
+        """Handle window close event.
 
-    def on_tab_changed(self, event=None):
-        """Handle tab switch event."""
-        # TODO: Extract from main.py
+        Note: Currently no special cleanup needed.
+        Future: Add cleanup logic here (release resources, etc.)
+        """
         pass
