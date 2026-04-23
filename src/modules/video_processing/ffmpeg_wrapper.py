@@ -1,9 +1,13 @@
 """FFmpeg wrapper functions."""
 import json
+import logging
 import os
 import shutil
 import subprocess
 from pathlib import Path
+from typing import Optional, Callable, Tuple
+
+logger = logging.getLogger(__name__)
 
 HERE = Path(__file__).parent.parent.parent.parent
 LOCAL_FFMPEG = HERE / "bin" / "ffmpeg" / "ffmpeg.exe"
@@ -28,8 +32,24 @@ def ffprobe_cmd() -> str:
         return "ffprobe"
     raise RuntimeError("Khong tim thay ffprobe!")
 
-def extract_audio_local(video_path: Path, out_audio: Path, log_cb=None) -> Path:
-    """Trich xuat audio tu file video local bang ffmpeg."""
+def extract_audio_local(video_path: Path, out_audio: Path, log_cb: Optional[Callable[[str], None]] = None) -> Path:
+    """Extract audio track from local video file using FFmpeg.
+
+    Converts video audio to mono MP3 at 16kHz sample rate, optimized for
+    speech recognition. Handles Unicode filenames on Windows.
+
+    Args:
+        video_path: Path to input video file
+        out_audio: Path where audio file will be saved
+        log_cb: Optional callback function for logging progress
+
+    Returns:
+        Path to extracted audio file
+
+    Raises:
+        RuntimeError: If FFmpeg extraction fails
+        FileNotFoundError: If output audio file was not created
+    """
     def _log(m): log_cb and log_cb(m)
     _log("->  Trich xuat audio tu file local...")
 
@@ -69,7 +89,18 @@ def extract_audio_local(video_path: Path, out_audio: Path, log_cb=None) -> Path:
 
 # ─── CONFIG PERSISTENCE ───────────────────────────────────────────────────────
 
-def get_dims(path: Path) -> tuple:
+def get_dims(path: Path) -> Tuple[int, int]:
+    """Get video dimensions using ffprobe.
+
+    Args:
+        path: Path to video file
+
+    Returns:
+        Tuple of (width, height) in pixels
+
+    Raises:
+        RuntimeError: If ffprobe fails to read video
+    """
     cmd  = [ffprobe_cmd(), "-v", "error", "-select_streams", "v:0",
             "-show_entries", "stream=width,height", "-of", "json", str(path)]
     data = json.loads(subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace").stdout)
@@ -93,6 +124,7 @@ def probe_duration(path: Path) -> float:
     ).stdout.strip()
     try:
         return float(out)
-    except Exception:
+    except (ValueError, TypeError) as e:
+        logger.debug(f"Could not parse duration from ffprobe output: {e}")
         return 0.0
 

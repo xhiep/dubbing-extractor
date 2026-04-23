@@ -30,17 +30,17 @@ class SubtitleController:
         self.on_preset_changed_fn = on_preset_changed_fn
         self.on_param_changed_fn = on_param_changed_fn
 
-    def on_cover_mode_changed(self, event=None):
+    def on_cover_mode_changed(self, event=None) -> None:
         """Handle cover mode selection change."""
         if self.on_cover_mode_changed_fn:
             self.on_cover_mode_changed_fn(event)
 
-    def on_preset_changed(self, event=None):
+    def on_preset_changed(self, event=None) -> None:
         """Handle subtitle preset selection."""
         if self.on_preset_changed_fn:
             self.on_preset_changed_fn(event)
 
-    def on_param_changed(self, event=None):
+    def on_param_changed(self, event=None) -> None:
         """Handle parameter changes (blur, font, margin, etc.)."""
         if self.on_param_changed_fn:
             self.on_param_changed_fn(event)

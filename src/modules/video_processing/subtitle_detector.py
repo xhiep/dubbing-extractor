@@ -145,10 +145,28 @@ def _merge_sub_events(samples: list, duration: float, interval: float, h: int) -
         final.append(dict(event))
     return final
 
-def detect_sub_events(src: Path, w: int, h: int, log_cb=None) -> list:
-    """
-    Quet video theo nhieu mau frame de tim cac doan co sub cu.
-    Chi tao event khi frame do detect thay chu. Khong co chu thi bo qua.
+def detect_sub_events(src: Path, w: int, h: int, log_cb: Optional[Callable[[str], None]] = None) -> List[Dict[str, float]]:
+    """Detect original subtitle regions in video using frame analysis.
+
+    Samples video frames at intervals and analyzes brightness patterns to identify
+    subtitle regions. Returns time ranges where subtitles appear with their vertical positions.
+
+    Args:
+        src: Path to source video file
+        w: Video width in pixels
+        h: Video height in pixels
+        log_cb: Optional callback function for logging progress
+
+    Returns:
+        List of subtitle events, each containing:
+            - start: Start time in seconds
+            - end: End time in seconds
+            - top_y: Top Y coordinate of subtitle region
+            - bottom_y: Bottom Y coordinate of subtitle region
+            - height: Height of subtitle region in pixels
+
+    Raises:
+        RuntimeError: If frame extraction fails
     """
     def _log(m): log_cb and log_cb(m)
 

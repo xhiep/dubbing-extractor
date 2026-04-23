@@ -1,7 +1,10 @@
 ﻿"""Burn subtitles into video."""
+import logging
 import subprocess
 from pathlib import Path
 from typing import Optional, Callable
+
+logger = logging.getLogger(__name__)
 
 from .ffmpeg_wrapper import ffmpeg_cmd, get_dims
 from .video_encoder import _has_nvenc, _build_enc_args, _run_ff
@@ -14,7 +17,8 @@ def _check_libass() -> bool:
         r  = subprocess.run([ff, "-hide_banner", "-filters"],
                             capture_output=True, text=True, timeout=5)
         return "subtitles" in r.stdout
-    except Exception:
+    except (subprocess.SubprocessError, OSError) as e:
+        logger.debug(f"Could not check libass support: {e}")
         return False
 
 def _compute_burn_margin(h: int, subtitle_top_y: Optional[int], subtitle_bottom_y: Optional[int]) -> int:
@@ -59,19 +63,30 @@ def burn_subtitle(
     dst: Path,
     subtitle_top_y: Optional[int],
     subtitle_bottom_y: Optional[int] = None,
-    log_cb: Optional[Callable] = None,
+    log_cb: Optional[Callable[[str], None]] = None,
     font_scale: float = 1.0,
     font_size_override: int = 0,
     margin_offset: int = 0,
-):
-    """Burn Vietnamese subtitles into video.
-    
+) -> None:
+    """Burn Vietnamese subtitles into video using FFmpeg libass.
+
+    Embeds SRT subtitles directly into video frames with customizable styling.
+    Automatically positions subtitles based on detected original subtitle locations.
+    Uses NVENC GPU encoding when available, falls back to CPU.
+
     Args:
-        src: Source video path
-        srt: SRT subtitle file path
-        dst: Destination video path
-        subtitle_top_y: Top Y position of old subtitles (for positioning)
-        log_cb: Logging callback
+        src: Path to source video file
+        srt: Path to SRT subtitle file
+        dst: Path where output video will be saved
+        subtitle_top_y: Top Y coordinate of original subtitles (for positioning)
+        subtitle_bottom_y: Bottom Y coordinate of original subtitles
+        log_cb: Optional callback function for logging progress
+        font_scale: Font size scale multiplier
+        font_size_override: Override font size in points (0 = auto-calculate)
+        margin_offset: Additional margin offset in pixels
+
+    Raises:
+        RuntimeError: If FFmpeg subtitle burning fails
     """
     def _log(m):
         if log_cb:

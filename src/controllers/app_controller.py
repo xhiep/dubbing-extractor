@@ -28,7 +28,7 @@ class AppController:
         self.save_config_fn = save_config_fn
         self.load_config_fn = load_config_fn
 
-    def on_config_save(self, config_dict: Dict[str, Any]):
+    def on_config_save(self, config_dict: Dict[str, Any]) -> None:
         """Handle config save request.
 
         Args:
@@ -47,7 +47,7 @@ class AppController:
             return self.load_config_fn()
         return {}
 
-    def on_window_close(self):
+    def on_window_close(self) -> None:
         """Handle window close event.
 
         Note: Currently no special cleanup needed.

@@ -1,50 +1,59 @@
-﻿"""Logging utilities."""
-import sys
-from datetime import datetime
-from pathlib import Path
-from typing import Optional, Callable
+﻿"""
+Structured logging setup for dubbing-extractor application.
 
-class Logger:
-    """Simple logger with callback support."""
-    
-    def __init__(self, log_file: Optional[Path] = None, callback: Optional[Callable] = None):
-        self.log_file = log_file
-        self.callback = callback
-    
-    def log(self, message: str, level: str = "INFO"):
-        """Log a message."""
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        formatted = f"[{timestamp}] [{level}] {message}"
-        
-        # Print to console
-        print(formatted)
-        
-        # Write to file if specified
-        if self.log_file:
-            try:
-                with open(self.log_file, "a", encoding="utf-8") as f:
-                    f.write(formatted + "\n")
-            except Exception:
-                pass
-        
-        # Call callback if specified
-        if self.callback:
-            try:
-                self.callback(message)
-            except Exception:
-                pass
-    
-    def info(self, message: str):
-        self.log(message, "INFO")
-    
-    def warning(self, message: str):
-        self.log(message, "WARNING")
-    
-    def error(self, message: str):
-        self.log(message, "ERROR")
-    
-    def debug(self, message: str):
-        self.log(message, "DEBUG")
+Provides centralized logging configuration with file rotation and console output.
+"""
 
-# Default logger instance
-default_logger = Logger()
+import logging
+import os
+from logging.handlers import RotatingFileHandler
+
+
+def setup_logging():
+    """
+    Configure structured logging for the application.
+
+    Sets up:
+    - File logging to output/app.log with rotation (10MB max, 3 backups)
+    - Console logging for ERROR level and above
+    - Structured log format with timestamps
+
+    Returns:
+        logging.Logger: Configured logger instance
+    """
+    # Create output directory if it doesn't exist
+    output_dir = "output"
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    # Get or create logger
+    logger = logging.getLogger("dubbing_extractor")
+    logger.setLevel(logging.INFO)
+
+    # Avoid adding handlers multiple times if setup_logging is called again
+    if logger.handlers:
+        return logger
+
+    # File handler with rotation
+    log_file = os.path.join(output_dir, "app.log")
+    file_handler = RotatingFileHandler(
+        log_file,
+        maxBytes=10 * 1024 * 1024,  # 10MB
+        backupCount=3,
+        encoding="utf-8"
+    )
+    file_handler.setLevel(logging.INFO)
+    file_formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+    file_handler.setFormatter(file_formatter)
+    logger.addHandler(file_handler)
+
+    # Console handler for critical errors only
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.ERROR)
+    console_formatter = logging.Formatter("%(levelname)s: %(message)s")
+    console_handler.setFormatter(console_formatter)
+    logger.addHandler(console_handler)
+
+    return logger

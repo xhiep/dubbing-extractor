@@ -98,7 +98,7 @@ Dọn dẹp và tái cấu trúc codebase Dubbing Extractor để cải thiện 
 
 **Testing**: `vulture` or manual grep for unused code
 
-### NFR3: Consistent Error Handling
+### NFR3: Consistent Error Handling (QI-01)
 
 **Priority**: HIGH
 
@@ -127,7 +127,7 @@ except Exception as e:
     show_error_to_user("Lỗi không mong đợi. Xem log để biết chi tiết.")
 ```
 
-### NFR4: Improved Logging
+### NFR4: Improved Logging (QI-02)
 
 **Priority**: MEDIUM
 
@@ -150,7 +150,7 @@ logging.basicConfig(
 )
 ```
 
-### NFR5: Type Hints Coverage
+### NFR5: Type Hints Coverage (QI-03)
 
 **Priority**: MEDIUM
 
@@ -178,7 +178,7 @@ def process_video(
 
 **Verification**: Run `mypy src/` (no errors on public APIs)
 
-### NFR6: Documentation Accuracy
+### NFR6: Documentation Accuracy (QI-04, QI-06)
 
 **Priority**: MEDIUM
 
@@ -194,7 +194,7 @@ def process_video(
 - ✅ All public functions have docstrings
 - ✅ Complex algorithms have explanatory comments
 
-### NFR7: Resource Cleanup
+### NFR7: Resource Cleanup (QI-05, QI-07)
 
 **Priority**: MEDIUM
 

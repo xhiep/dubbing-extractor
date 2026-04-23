@@ -1,9 +1,13 @@
 """yt-dlp wrapper for downloading videos from various platforms."""
+import logging
 import re
 import subprocess
 import sys
 import urllib.request
 from pathlib import Path
+from typing import Optional, Callable, Tuple
+
+logger = logging.getLogger(__name__)
 
 from .platform_detector import detect_platform
 from ..video_processing.ffmpeg_wrapper import LOCAL_FFMPEG
@@ -34,7 +38,8 @@ def resolve_short_douyin_url(url: str, log_cb=None) -> str:
             if final_url != url:
                 _log("->  Da resolve short URL Douyin")
             return final_url
-    except Exception:
+    except (urllib.error.URLError, OSError) as e:
+        logger.debug(f"Could not resolve Douyin short URL: {e}")
         return url
 
 
@@ -96,7 +101,8 @@ def _cookies_have_domain(cookies_file: Path, domain_markers: tuple[str, ...]) ->
     """Check whether cookies.txt contains entries for a target domain."""
     try:
         content = cookies_file.read_text(encoding="utf-8", errors="ignore")
-    except Exception:
+    except (OSError, IOError) as e:
+        logger.debug(f"Could not read cookies file: {e}")
         return False
     lines = [l for l in content.splitlines() if not l.startswith("#") and l.strip()]
     return any(any(marker in line for marker in domain_markers) for line in lines)
@@ -266,7 +272,27 @@ def _build_extra_ydl_opts(platform: str, log_cb=None) -> dict:
 
 # ─── FFMPEG HELPERS ───────────────────────────────────────────────────────────
 
-def download(url: str, work_dir: Path, log_cb=None) -> tuple:
+def download(url: str, work_dir: Path, log_cb: Optional[Callable[[str], None]] = None) -> Tuple[Path, Path, str]:
+    """Download video and audio from URL using yt-dlp.
+
+    Supports multiple platforms (YouTube, Bilibili, Douyin) with platform-specific
+    optimizations. Automatically handles cookies, headers, and format selection.
+
+    Args:
+        url: Video URL (YouTube, Bilibili, Douyin, etc.)
+        work_dir: Working directory for downloaded files
+        log_cb: Optional callback function for logging progress
+
+    Returns:
+        Tuple containing:
+            - video_path: Path to downloaded video file (MP4)
+            - audio_path: Path to extracted audio file (MP3)
+            - title: Video title
+
+    Raises:
+        RuntimeError: If download fails or requires cookies
+        FileNotFoundError: If downloaded files are missing
+    """
     import yt_dlp
 
     def _log(m): log_cb and log_cb(m)

@@ -26,6 +26,7 @@ sys.path.insert(0, str(HERE))
 from src.utils.suppress_warnings import install_stderr_filter
 install_stderr_filter()
 
+from src.utils.logger import setup_logging
 from src.config import config, load_app_config, save_app_config
 from src.modules.workflow import (
     process_video,
@@ -2519,4 +2520,8 @@ def launch_gui():
     root.mainloop()
 
 if __name__ == "__main__":
+    # Initialize logging
+    logger = setup_logging()
+    logger.info("Application started")
+
     launch_gui()

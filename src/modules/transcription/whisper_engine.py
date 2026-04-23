@@ -1,15 +1,59 @@
 """Whisper transcription engine with explicit resource cleanup between runs."""
 import gc
+import logging
 import os
 from pathlib import Path
+from typing import Optional, Callable, List, Dict, Any
+from contextlib import contextmanager
 
 import torch
 import whisper
+
+logger = logging.getLogger(__name__)
 
 from ...config import config
 from ..video_processing.ffmpeg_wrapper import LOCAL_FFMPEG
 
 _active_model = None
+
+
+@contextmanager
+def managed_whisper_model(model_name: str, device: str):
+    """Load and automatically cleanup Whisper model.
+
+    Ensures model is properly unloaded even if transcription fails.
+    Moves model to CPU, deletes reference, and clears caches on exit.
+
+    Args:
+        model_name: Whisper model size (tiny/base/small/medium/large)
+        device: Device to load on (cpu/cuda)
+
+    Yields:
+        Loaded Whisper model instance
+
+    Example:
+        with managed_whisper_model("base", "cuda") as model:
+            result = model.transcribe("audio.wav")
+    """
+    model = None
+    try:
+        logger.info(f"Loading Whisper {model_name} on {device}")
+        model = whisper.load_model(model_name, device=device)
+        yield model
+    finally:
+        if model is not None:
+            logger.info("Cleaning up Whisper model")
+            try:
+                model.cpu()
+            except Exception as e:
+                logger.warning(f"Error moving model to CPU: {e}")
+            del model
+            gc.collect()
+            if device == "cuda":
+                try:
+                    torch.cuda.empty_cache()
+                except Exception:
+                    pass
 
 
 def _detect_unstable_cuda_reason() -> str | None:
@@ -90,20 +134,40 @@ def _run_transcription(audio: Path, model_name: str, device: str, use_fp16: bool
         _log("->  Chay Whisper tren CPU")
 
     _log(f"->  Tai Whisper [{model_name}] tren {device.upper()}...")
-    model = _load_model(model_name, device)
-    _log("->  Model san sang. Dang nhan dang...")
 
-    kwargs = {"verbose": False, "task": "transcribe", "fp16": use_fp16}
-    if config["source_language"]:
-        kwargs["language"] = config["source_language"]
+    with managed_whisper_model(model_name, device) as model:
+        _log("->  Model san sang. Dang nhan dang...")
 
-    result = model.transcribe(str(audio), **kwargs)
-    segments = result.get("segments", [])
-    _log(f"->  {len(segments)} cau | ngon ngu: {result.get('language', '?')}")
-    return segments
+        kwargs = {"verbose": False, "task": "transcribe", "fp16": use_fp16}
+        if config["source_language"]:
+            kwargs["language"] = config["source_language"]
+
+        result = model.transcribe(str(audio), **kwargs)
+        segments = result.get("segments", [])
+        _log(f"->  {len(segments)} cau | ngon ngu: {result.get('language', '?')}")
+        return segments
 
 
-def transcribe(audio: Path, log_cb=None) -> list:
+def transcribe(audio: Path, log_cb: Optional[Callable[[str], None]] = None) -> List[Dict[str, Any]]:
+    """Transcribe audio file using Whisper speech recognition.
+
+    Automatically selects optimal device (CUDA or CPU) based on hardware compatibility.
+    Falls back to CPU if CUDA runs out of memory. Cleans up model resources after completion.
+
+    Args:
+        audio: Path to audio file (MP3, WAV, etc.)
+        log_cb: Optional callback function for logging progress
+
+    Returns:
+        List of transcription segments, each containing:
+            - start: Start time in seconds
+            - end: End time in seconds
+            - text: Transcribed text
+            - id: Segment ID
+
+    Raises:
+        RuntimeError: If transcription fails on both CUDA and CPU
+    """
     def _log(message):
         if log_cb:
             log_cb(message)

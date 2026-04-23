@@ -1,12 +1,15 @@
 """Main video processing workflow."""
 import json
+import logging
 import os
 import shutil
 import statistics
 import gc
 from pathlib import Path
 from datetime import datetime
-from typing import Optional, Callable
+from typing import Optional, Callable, Dict, List, Any
+
+logger = logging.getLogger(__name__)
 
 from .downloader.platform_detector import detect_platform
 from .downloader.ytdlp_wrapper import download
@@ -44,8 +47,8 @@ def _log_runtime_memory(log_cb: Optional[Callable], stage: str) -> None:
         process = psutil.Process(os.getpid())
         rss_mb = process.memory_info().rss / 1024 / 1024
         parts.append(f"rss={rss_mb:.0f}MB")
-    except Exception:
-        pass
+    except (ImportError, AttributeError) as e:
+        logger.debug(f"Could not get memory info: {e}")
 
     try:
         import torch
@@ -54,8 +57,8 @@ def _log_runtime_memory(log_cb: Optional[Callable], stage: str) -> None:
             reserved_mb = torch.cuda.memory_reserved() / 1024 / 1024
             parts.append(f"cuda_alloc={allocated_mb:.0f}MB")
             parts.append(f"cuda_reserved={reserved_mb:.0f}MB")
-    except Exception:
-        pass
+    except (ImportError, AttributeError) as e:
+        logger.debug(f"Could not get CUDA memory info: {e}")
 
     if parts:
         _log(f"[MEM] {stage}: " + " | ".join(parts))
@@ -107,12 +110,28 @@ def _retime_cover_events(detected_events: list, segments: list) -> list:
 
 def step1_prepare(
     source_input: str,
-    log_cb: Optional[Callable] = None,
-) -> dict:
-    """Bước 1: Tải video hoặc dùng file local, trích xuất audio.
+    log_cb: Optional[Callable[[str], None]] = None,
+) -> Dict[str, str]:
+    """Download video or use local file and extract audio.
+
+    Handles both remote URLs (YouTube, Bilibili, Douyin) and local video files.
+    Creates output directory and extracts audio for transcription.
+
+    Args:
+        source_input: Video URL or local file path
+        log_cb: Optional callback function for logging progress
 
     Returns:
-        dict với keys: raw_video, raw_audio, title, out_dir, temp_dir
+        Dictionary containing paths and metadata:
+            - raw_video: Path to video file
+            - raw_audio: Path to extracted audio (MP3)
+            - title: Video title or filename
+            - out_dir: Output directory path
+            - temp_dir: Temporary working directory path
+
+    Raises:
+        FileNotFoundError: If local file does not exist
+        RuntimeError: If download or audio extraction fails
     """
     _log = _make_log(log_cb)
     _log("\n" + "="*52 + "\n  BƯỚC 1: TẢI VIDEO & AUDIO\n" + "="*52)
@@ -147,12 +166,25 @@ def step1_prepare(
 
 def step2_transcribe(
     audio_path: str,
-    log_cb: Optional[Callable] = None,
-) -> list:
-    """Bước 2: Nhận dạng giọng nói bằng Whisper.
+    log_cb: Optional[Callable[[str], None]] = None,
+) -> List[Dict[str, Any]]:
+    """Transcribe audio using Whisper speech recognition.
+
+    Uses Whisper model to convert speech to text with timestamps.
+    Automatically selects CPU or CUDA device based on hardware compatibility.
+
+    Args:
+        audio_path: Path to audio file (MP3 format)
+        log_cb: Optional callback function for logging progress
 
     Returns:
-        list segments (transcription gốc)
+        List of transcription segments, each containing:
+            - start: Start time in seconds
+            - end: End time in seconds
+            - text: Transcribed text
+
+    Raises:
+        RuntimeError: If Whisper transcription fails
     """
     _log = _make_log(log_cb)
     _log("\n" + "="*52 + "\n  BƯỚC 2: NHẬN DẠNG GIỌNG NÓI (WHISPER)\n" + "="*52)
@@ -165,12 +197,29 @@ def step3_translate(
     subtitle_timing_scale: float = 1.0,
     subtitle_offset_sec: float = 0.0,
     video_speed: float = 1.0,
-    log_cb: Optional[Callable] = None,
-) -> list:
-    """Bước 3: Dịch sang tiếng Việt và áp dụng timing.
+    log_cb: Optional[Callable[[str], None]] = None,
+) -> List[Dict[str, Any]]:
+    """Translate segments to Vietnamese and apply timing adjustments.
+
+    Uses Google Translate to convert transcribed text to Vietnamese.
+    Applies timing scale, offset, and video speed adjustments to timestamps.
+
+    Args:
+        segs: List of transcription segments with text and timestamps
+        subtitle_timing_scale: Timing scale multiplier (default 1.0)
+        subtitle_offset_sec: Time offset in seconds to shift all subtitles
+        video_speed: Video playback speed multiplier (default 1.0)
+        log_cb: Optional callback function for logging progress
 
     Returns:
-        list segments đã dịch (segs_vi)
+        List of translated segments, each containing:
+            - start: Adjusted start time in seconds
+            - end: Adjusted end time in seconds
+            - text: Vietnamese translated text
+            - original: Original text before translation
+
+    Raises:
+        ConnectionError: If translation API is unreachable
     """
     _log = _make_log(log_cb)
     if not segs:
@@ -192,12 +241,31 @@ def step4_cover(
     cover_offset_px: int = 0,
     blur_power: int = 4,
     video_speed: float = 1.0,
-    log_cb: Optional[Callable] = None,
-) -> dict:
-    """Bước 4: Che phụ đề gốc và render video sạch.
+    log_cb: Optional[Callable[[str], None]] = None,
+) -> Dict[str, Any]:
+    """Cover original subtitles and render clean video.
+
+    Detects original subtitle regions using OpenCV and covers them with blur
+    or black bars. Adjusts video speed if specified.
+
+    Args:
+        raw_video: Path to raw video file
+        segs_vi: List of Vietnamese subtitle segments for timing
+        out_dir: Output directory path
+        cover_mode: Covering method (none, blur, blackbar)
+        blur_padding_px: Extra padding around subtitle region in pixels
+        cover_offset_px: Vertical offset to shift cover region
+        blur_power: Blur intensity (1-10)
+        video_speed: Video playback speed multiplier
+        log_cb: Optional callback function for logging progress
 
     Returns:
-        dict với keys: final_video (str path), cover_meta (dict)
+        Dictionary containing:
+            - final_video: Path to rendered video
+            - cover_meta: Metadata about subtitle covering (positions, mode)
+
+    Raises:
+        RuntimeError: If video encoding fails
     """
     _log = _make_log(log_cb)
     _log("\n" + "="*52 + "\n  BƯỚC 4: CHE PHỤ ĐỀ GỐC\n" + "="*52)
@@ -252,12 +320,35 @@ def step5_export(
     subtitle_timing_scale: float = 1.0,
     video_speed: float = 1.0,
     cover_mode: str = "blur",
-    log_cb: Optional[Callable] = None,
+    log_cb: Optional[Callable[[str], None]] = None,
 ) -> Optional[str]:
-    """Bước 5: Xuất file SRT, script, song ngữ, render_meta.
+    """Export SRT subtitle file, script, bilingual reference, and render metadata.
+
+    Creates multiple output files for different use cases: SRT for video players,
+    plain text script for review, bilingual reference for comparison, and JSON
+    metadata for reproducing render settings.
+
+    Args:
+        segs_vi: List of Vietnamese subtitle segments
+        out_dir: Output directory path
+        title: Video title for file headers
+        cover_meta: Metadata from subtitle covering step
+        raw_video: Path to raw video (for dimensions)
+        srt_max_chars_per_line: Maximum characters per subtitle line
+        subtitle_font_scale: Font size scale multiplier
+        subtitle_font_size: Override font size in points
+        subtitle_margin_px: Margin offset in pixels
+        blur_padding_px: Blur padding used in covering
+        blur_power: Blur power used in covering
+        cover_offset_px: Cover offset used in covering
+        subtitle_offset_sec: Subtitle time offset
+        subtitle_timing_scale: Subtitle timing scale
+        video_speed: Video speed multiplier
+        cover_mode: Cover mode used
+        log_cb: Optional callback function for logging progress
 
     Returns:
-        str path của file SRT, hoặc None nếu không có segment
+        Path to SRT file if successful, None if no segments to export
     """
     _log = _make_log(log_cb)
     _log("\n" + "="*52 + "\n  BƯỚC 5: XUẤT FILE OUTPUT\n" + "="*52)
@@ -332,12 +423,28 @@ def step6_burn(
     subtitle_font_scale: float = 1.0,
     subtitle_font_size: int = 0,
     subtitle_margin_px: int = 0,
-    log_cb: Optional[Callable] = None,
+    log_cb: Optional[Callable[[str], None]] = None,
 ) -> str:
-    """Bước 6: Ghi phụ đề tiếng Việt vào video.
+    """Burn Vietnamese subtitles into video using FFmpeg.
+
+    Embeds SRT subtitles directly into video frames with customizable styling.
+    Positions subtitles based on detected original subtitle locations.
+
+    Args:
+        final_video: Path to clean video (after subtitle covering)
+        srt_path: Path to SRT subtitle file
+        cover_meta: Metadata containing subtitle position info
+        out_dir: Output directory path
+        subtitle_font_scale: Font size scale multiplier
+        subtitle_font_size: Override font size in points (0 = auto)
+        subtitle_margin_px: Additional margin offset in pixels
+        log_cb: Optional callback function for logging progress
 
     Returns:
-        str path video đã burn sub
+        Path to video with burned subtitles
+
+    Raises:
+        RuntimeError: If FFmpeg subtitle burning fails
     """
     _log = _make_log(log_cb)
     _log("\n" + "="*52 + "\n  BƯỚC 6: GHI PHỤ ĐỀ TV VÀO VIDEO\n" + "="*52)
@@ -371,12 +478,37 @@ def step7_dub(
     dub_source_volume: float = 0.18,
     dub_mix_mode: str = "nen_nho",
     output_video_name: str = "video_long_tieng.mp4",
-    log_cb: Optional[Callable] = None,
-) -> dict:
-    """Bước 7: Lồng tiếng tiếng Việt bằng VieNeu-TTS.
+    log_cb: Optional[Callable[[str], None]] = None,
+) -> Dict[str, Path]:
+    """Dub video with Vietnamese voice using VieNeu-TTS.
+
+    Synthesizes Vietnamese speech for each subtitle segment and mixes it with
+    the original video audio. Supports preset voices and voice cloning.
+
+    Args:
+        video_source: Path to source video file
+        dub_segments: List of subtitle segments to synthesize
+        out_dir: Output directory path
+        dub_mode: Voice mode (preset or clone)
+        dub_backend_mode: TTS backend (turbo, turbo_gpu, fast, remote)
+        dub_remote_api_base: API base URL for remote mode
+        dub_preset_voice: Preset voice name
+        dub_ref_audio: Reference audio path for voice cloning
+        dub_ref_text: Reference text for voice cloning
+        dub_voice_volume: Dubbed voice volume multiplier
+        dub_source_volume: Original audio volume multiplier
+        dub_mix_mode: Mixing mode (nen_nho or tat_goc)
+        output_video_name: Output video filename
+        log_cb: Optional callback function for logging progress
 
     Returns:
-        dict với keys: dub_track, dub_video
+        Dictionary containing:
+            - dub_track: Path to dubbed audio track (WAV)
+            - dub_video: Path to final dubbed video (MP4)
+
+    Raises:
+        RuntimeError: If TTS synthesis or audio mixing fails
+        ValueError: If no segments provided
     """
     _log = _make_log(log_cb)
     _log("\n" + "="*52 + "\n  BƯỚC 7: LỒNG TIẾNG TIẾNG VIỆT\n" + "="*52)
@@ -410,7 +542,7 @@ def process_video(
     source_input: str,
     cover_mode: str = "blur",
     burn_sub: bool = False,
-    log_cb: Optional[Callable] = None,
+    log_cb: Optional[Callable[[str], None]] = None,
     subtitle_offset_sec: float = 0.0,
     subtitle_timing_scale: float = 1.0,
     video_speed: float = 1.0,

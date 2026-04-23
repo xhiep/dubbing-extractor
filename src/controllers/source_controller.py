@@ -28,11 +28,11 @@ class SourceController:
         self.start_processing_fn = start_processing_fn
         self.run_step_fn = run_step_fn
 
-    def on_start_clicked(self):
+    def on_start_clicked(self) -> None:
         """Handle start processing button click."""
         self.start_processing_fn()
 
-    def on_step_clicked(self, step_num: int):
+    def on_step_clicked(self, step_num: int) -> None:
         """Handle step button click.
 
         Args:

@@ -1,6 +1,9 @@
 """URL resolution for short links."""
+import logging
 import urllib.request
 from typing import Optional, Callable
+
+logger = logging.getLogger(__name__)
 
 def resolve_short_douyin_url(url: str, log_cb=None) -> str:
     """
@@ -24,6 +27,7 @@ def resolve_short_douyin_url(url: str, log_cb=None) -> str:
             if resolved != url:
                 _log(f"-> Resolved short link: {resolved[:80]}")
             return resolved
-    except Exception as e:
+    except (urllib.error.URLError, OSError) as e:
+        logger.warning(f"Could not resolve short link: {e}")
         _log(f"-> Khong the resolve short link ({e}), dung URL goc")
         return url

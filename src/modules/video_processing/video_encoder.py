@@ -1,10 +1,13 @@
 ﻿"""Video encoding with NVENC GPU support."""
+import logging
 import re
 import subprocess
 import tempfile
 import statistics
 from pathlib import Path
 from typing import Optional, Callable, Tuple, List, Dict
+
+logger = logging.getLogger(__name__)
 
 from .ffmpeg_wrapper import ffmpeg_cmd, probe_duration
 from ...utils.file_utils import safe_path
@@ -15,7 +18,8 @@ def _has_nvenc() -> bool:
         r  = subprocess.run([ff, "-hide_banner", "-encoders"],
                             capture_output=True, text=True, timeout=5)
         return "h264_nvenc" in r.stdout
-    except Exception:
+    except (subprocess.SubprocessError, OSError) as e:
+        logger.debug(f"Could not detect NVENC support: {e}")
         return False
 
 def _build_enc_args(use_nvenc: bool) -> tuple:
@@ -278,12 +282,12 @@ def render_clean_video(
     dst: Path,
     mode: str,
     events: list,
-    log_cb=None,
+    log_cb: Optional[Callable[[str], None]] = None,
     blur_padding_px: int = 0,
     cover_offset_px: int = 0,
     blur_power: int = 4,
     video_speed: float = 1.0,
-) -> dict:
+) -> Dict[str, Any]:
     """Render video with subtitle covering.
     
     Args:

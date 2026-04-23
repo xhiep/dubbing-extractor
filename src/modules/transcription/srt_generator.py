@@ -5,7 +5,22 @@ from typing import List, Dict
 from ...utils.text_utils import srt_time
 
 def parse_srt(srt_path: Path) -> List[Dict]:
-    """Parse an SRT file into timed subtitle segments."""
+    """Parse an SRT subtitle file into timed segments.
+
+    Reads SRT format and extracts timing and text information for each subtitle.
+
+    Args:
+        srt_path: Path to SRT subtitle file
+
+    Returns:
+        List of subtitle segments, each containing:
+            - start: Start time in seconds
+            - end: End time in seconds
+            - text: Subtitle text (may contain multiple lines)
+
+    Raises:
+        FileNotFoundError: If SRT file does not exist
+    """
     if not srt_path.exists():
         return []
 
@@ -32,8 +47,20 @@ def parse_srt(srt_path: Path) -> List[Dict]:
         })
     return segments
 
-def write_srt(segments: List[Dict], output_path: Path, max_chars_per_line: int = 45):
-    """Write segments to SRT file."""
+def write_srt(segments: List[Dict], output_path: Path, max_chars_per_line: int = 45) -> None:
+    """Write subtitle segments to SRT file format.
+
+    Formats segments into standard SRT format with automatic line wrapping
+    for long text. Each subtitle is numbered sequentially.
+
+    Args:
+        segments: List of segments with 'start', 'end', and 'text' fields
+        output_path: Path where SRT file will be written
+        max_chars_per_line: Maximum characters per line before wrapping
+
+    Raises:
+        IOError: If file cannot be written
+    """
     with open(output_path, "w", encoding="utf-8") as f:
         for i, seg in enumerate(segments, 1):
             start = srt_time(seg["start"])

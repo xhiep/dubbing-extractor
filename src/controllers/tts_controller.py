@@ -33,22 +33,22 @@ class TtsController:
         self.play_tts_preview_fn = play_tts_preview_fn
         self.stop_preview_audio_fn = stop_preview_audio_fn
 
-    def on_dub_mode_changed(self, event=None):
+    def on_dub_mode_changed(self, event=None) -> None:
         """Handle TTS mode selection change."""
         if self.on_dub_mode_changed_fn:
             self.on_dub_mode_changed_fn(event)
 
-    def on_voice_changed(self, event=None):
+    def on_voice_changed(self, event=None) -> None:
         """Handle voice selection change."""
         if self.on_voice_changed_fn:
             self.on_voice_changed_fn(event)
 
-    def on_tts_preview(self):
+    def on_tts_preview(self) -> None:
         """Handle TTS preview request."""
         if self.play_tts_preview_fn:
             self.play_tts_preview_fn()
 
-    def on_stop_preview(self):
+    def on_stop_preview(self) -> None:
         """Handle stop preview request."""
         if self.stop_preview_audio_fn:
             self.stop_preview_audio_fn()

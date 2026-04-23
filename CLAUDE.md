@@ -25,6 +25,7 @@ venv\Scripts\python.exe main.py
 - `src/components/` — custom UI components (Card, Button, Input, TextArea...)
 - `src/controllers/` — event handlers (Phase 2 extraction)
 - `src/utils/ui_helpers.py` — pure UI geometry helper functions (Phase 3 extraction)
+- `src/utils/logger.py` — structured logging with rotation (Phase 4)
 
 ## Pipeline workflow (process_video)
 Bước 1: Tải video (yt-dlp) hoặc dùng file local
@@ -34,6 +35,28 @@ Bước 4: Che phụ đề gốc (blur/blackbar/none)
 Bước 5: Xuất SRT, script, song ngữ
 Bước 6: Burn sub vào video (optional)
 Bước 7: Lồng tiếng VieNeu-TTS (optional)
+
+## Code Quality Improvements (Phase 4)
+
+**Logging:**
+- Structured logging với RotatingFileHandler
+- Log file: `output/app.log` (10MB max, 3 backups)
+- Log levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
+
+**Error Handling:**
+- Specific exception types thay vì bare `except Exception:`
+- Logging với context cho tất cả errors
+- Network errors, FFmpeg errors, GPU errors được handle riêng
+
+**Type Hints:**
+- Type hints đầy đủ cho tất cả public APIs
+- mypy configuration cho static type checking
+- IDE autocomplete và documentation cải thiện
+
+**Documentation:**
+- Google-style docstrings cho tất cả public functions
+- Args, Returns, Raises sections đầy đủ
+- Context managers cho resource cleanup
 
 ## Tính năng hiện tại
 

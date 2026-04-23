@@ -3,8 +3,11 @@ from __future__ import annotations
 
 import gc
 import importlib
+import logging
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Callable, List
+
+logger = logging.getLogger(__name__)
 
 from ...utils.runtime_env import ensure_local_runtime_env
 
@@ -21,7 +24,14 @@ DEFAULT_REMOTE_API_BASE = "http://localhost:23333/v1"
 
 
 def release_tts_resources() -> None:
-    """Drop cached VieNeu engines/voices to free RAM/VRAM between runs."""
+    """Release cached TTS engines and voices to free memory.
+
+    Calls cleanup methods on cached engines, clears caches, and triggers
+    garbage collection. Also empties CUDA cache if available.
+
+    This function is safe to call multiple times and handles exceptions
+    during cleanup to avoid masking original errors.
+    """
     for engine in list(_TTS_CACHE.values()):
         for attr in ("close", "cleanup", "shutdown", "unload"):
             fn = getattr(engine, attr, None)
@@ -128,11 +138,12 @@ def list_preset_voices(
     backbone_repo: str = DEFAULT_BACKBONE_REPO,
     backbone_device: str = DEFAULT_BACKBONE_DEVICE,
     remote_api_base: str = DEFAULT_REMOTE_API_BASE,
-) -> list[str]:
+) -> List[str]:
     engine = _get_engine(engine_mode, backbone_repo, backbone_device, remote_api_base)
     try:
         voices = engine.list_preset_voices()
-    except Exception:
+    except (AttributeError, RuntimeError) as e:
+        logger.error(f"Could not list preset voices: {e}")
         voices = []
     result = []
     for voice in voices or []:
@@ -157,8 +168,35 @@ def synthesize_speech(
     backbone_repo: str = DEFAULT_BACKBONE_REPO,
     backbone_device: str = DEFAULT_BACKBONE_DEVICE,
     remote_api_base: str = DEFAULT_REMOTE_API_BASE,
-    log_cb=None,
+    log_cb: Optional[Callable[[str], None]] = None,
 ) -> Path:
+    """Synthesize Vietnamese speech from text using VieNeu-TTS.
+
+    Supports both preset voices and voice cloning from reference audio.
+    Caches voice encodings to improve performance for repeated synthesis.
+
+    Args:
+        text: Text to synthesize (Vietnamese)
+        out_path: Path where audio file will be saved
+        mode: Voice mode (preset or clone)
+        preset_voice: Name of preset voice to use
+        ref_audio: Path to reference audio for voice cloning
+        ref_text: Reference text for voice cloning
+        prepared_voice: Pre-encoded voice object (optional)
+        engine_mode: TTS backend mode (turbo, turbo_gpu, fast, remote)
+        backbone_repo: Custom model repository path
+        backbone_device: Device for model (cpu, cuda)
+        remote_api_base: API base URL for remote mode
+        log_cb: Optional callback function for logging progress
+
+    Returns:
+        Path to synthesized audio file
+
+    Raises:
+        ValueError: If text is empty
+        FileNotFoundError: If reference audio file not found
+        RuntimeError: If TTS synthesis fails
+    """
     text = (text or "").strip()
     if not text:
         raise ValueError("Text TTS dang rong.")

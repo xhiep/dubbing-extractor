@@ -4,7 +4,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Callable, Dict, List
 
 from ..video_processing.ffmpeg_wrapper import ffmpeg_cmd, probe_duration
 from .vieneu_engine import synthesize_speech
@@ -155,8 +155,39 @@ def render_dubbed_outputs(
     source_volume: float = 0.18,
     mix_mode: str = "nen_nho",
     output_video_name: str = "video_long_tieng.mp4",
-    log_cb=None,
-) -> dict[str, Path]:
+    log_cb: Optional[Callable[[str], None]] = None,
+) -> Dict[str, Path]:
+    """Render dubbed video with Vietnamese TTS audio mixed with original.
+
+    Synthesizes speech for each subtitle segment, adjusts timing to match segment
+    duration, builds a complete dubbed audio track, and mixes it with the original
+    video audio at specified volume levels.
+
+    Args:
+        video_path: Path to source video file
+        segments: List of subtitle segments with text and timing
+        out_dir: Output directory for dubbed files
+        mode: Voice mode (preset or clone)
+        engine_mode: TTS backend mode (turbo, turbo_gpu, fast, remote)
+        remote_api_base: API base URL for remote mode
+        preset_voice: Name of preset voice
+        ref_audio: Path to reference audio for voice cloning
+        ref_text: Reference text for voice cloning
+        dub_volume: Dubbed voice volume multiplier
+        source_volume: Original audio volume multiplier
+        mix_mode: Mixing mode (nen_nho keeps original, tat_goc mutes it)
+        output_video_name: Output video filename
+        log_cb: Optional callback function for logging progress
+
+    Returns:
+        Dictionary containing:
+            - dub_track: Path to dubbed audio track (WAV)
+            - dub_video: Path to final dubbed video (MP4)
+
+    Raises:
+        ValueError: If no segments provided
+        RuntimeError: If TTS synthesis or FFmpeg mixing fails
+    """
     if not segments:
         raise ValueError("Khong co cau dich de long tieng.")
 
