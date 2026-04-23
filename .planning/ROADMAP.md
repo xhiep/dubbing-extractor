@@ -194,101 +194,44 @@ Roadmap gồm 4 phases, thực hiện tuần tự từ low-risk đến higher-ri
 
 ## Phase 3: Split main.py Further (Higher Risk)
 
-**Goal**: Tách tab creation và layout logic ra separate files
+**Goal**: Extract pure helper functions and reorganize main.py with clear section markers
 
 **Duration**: 2-3 giờ
 
-**Risk Level**: MEDIUM-HIGH - Thay đổi structure, có thể break layout
+**Risk Level**: MEDIUM - Code organization, minimal risk of breaking functionality
 
-### Tasks
+**Plans**: 3 plans in 3 waves
 
-#### 3.1: Create Views Structure
-- **Action**: Tạo `src/views/` directory (optional, nếu cần)
-- **Files**:
-  ```
-  src/views/
-    __init__.py
-    main_window.py
-    tabs/
-      __init__.py
-      source_tab.py
-      subtitle_tab.py
-      tts_tab.py
-  ```
+Plans:
+- [ ] 03-01-PLAN.md — Extract pure helper functions to ui_helpers.py
+- [ ] 03-02-PLAN.md — Organize imports and add section markers
+- [ ] 03-03-PLAN.md — Final verification and documentation update
 
-#### 3.2: Extract Tab Creation Functions
-- **Option A**: Keep in main.py, just organize better
-- **Option B**: Move to `src/views/tabs/`
+### Wave Structure
 
-**Recommendation**: Option A (safer) - Organize in main.py with clear sections
-
-#### 3.3: Reorganize main.py Structure
-- **Target Structure**:
-  ```python
-  # main.py (~1000-1500 lines)
-  
-  # Imports
-  import ...
-  
-  # Constants
-  LOG_DIR = ...
-  
-  # Helper Functions (keep minimal)
-  def _rotate_log(): ...
-  
-  # Tab Creation Functions
-  def create_source_tab(parent, controllers): ...
-  def create_subtitle_tab(parent, controllers): ...
-  def create_tts_tab(parent, controllers): ...
-  
-  # Main Application Class
-  class DubbingExtractorApp:
-      def __init__(self):
-          self.setup_window()
-          self.create_controllers()
-          self.create_tabs()
-      
-      def setup_window(self): ...
-      def create_controllers(self): ...
-      def create_tabs(self): ...
-      def run(self): ...
-  
-  # Entry Point
-  if __name__ == "__main__":
-      app = DubbingExtractorApp()
-      app.run()
-  ```
-
-#### 3.4: Extract Helper Functions
-- **Move to**: `src/utils/ui_helpers.py`
-- **Candidates**:
-  - `_expand_band_from_center()`
-  - `_shift_band()`
-  - Other UI calculation helpers
-
-#### 3.5: Clean Up Imports
-- **Action**: Organize imports by category
-- **Order**: stdlib → third-party → local
-- **Tool**: `isort` (optional)
+| Wave | Plans | Autonomous |
+|------|-------|------------|
+| 1 | 03-01 | yes |
+| 2 | 03-02 | yes |
+| 3 | 03-03 | no (has checkpoint) |
 
 ### Success Criteria
-- ✅ main.py < 1500 lines (target achieved)
-- ✅ Clear structure with sections
-- ✅ Helper functions extracted
-- ✅ All features still work
-- ✅ Layout unchanged
+- ✅ Pure helper functions extracted to src/utils/ui_helpers.py
+- ✅ Imports organized into 3 categories (stdlib, third-party, local)
+- ✅ 9 major section markers added to launch_gui()
+- ✅ CLAUDE.md updated with accurate line counts
+- ✅ All features work identically
+- ✅ Code navigation significantly improved
 
 ### Testing
-- **Visual Test**: Compare UI before/after (should be identical)
-- **Full Pipeline Test**: Run complete workflow
-- **Resize Test**: Resize window, verify layout adapts
-- **Tab Test**: Switch between tabs, verify all controls
+- **Automated**: Syntax checks, import verification, organization checks
+- **Manual**: Full application testing (all tabs, processing, config persistence)
 
 ### Deliverables
-- Reorganized `main.py` (~1000-1500 lines)
-- `src/utils/ui_helpers.py` (if created)
-- Testing report: "Phase 3 complete, UI identical, all features working"
-
+- `src/utils/ui_helpers.py` with 2 pure functions
+- Reorganized `main.py` with clear sections (~2,517 lines)
+- Updated `CLAUDE.md`
+- Testing report: "Phase 3 complete, all features working"
 ---
 
 ## Phase 4: Quality Improvements (Ongoing)
