@@ -5,49 +5,38 @@ Handles:
 - Source input changes
 - Video preview
 - Metadata fetching
+
+Note: This is a thin wrapper controller. The actual implementation
+delegates to functions in main.py scope to avoid complex refactoring
+of state variables and closures.
 """
 from typing import Dict, Any, Optional, Callable
 
 
 class SourceController:
-    """Source tab controller."""
+    """Source tab controller - thin wrapper pattern."""
 
-    def __init__(self, widgets: Dict[str, Any], config: Dict[str, Any]):
+    def __init__(self,
+                 start_processing_fn: Callable,
+                 run_step_fn: Callable = None):
         """Initialize source controller.
 
         Args:
-            widgets: Dict of widget references
-                Required keys: TBD (will be determined during extraction)
-            config: Global config dict
+            start_processing_fn: Function to call for monolithic processing
+            run_step_fn: Function to call for step-by-step processing (optional)
         """
-        self.widgets = widgets
-        self.config = config
+        self.start_processing_fn = start_processing_fn
+        self.run_step_fn = run_step_fn
 
     def on_start_clicked(self):
         """Handle start processing button click."""
-        # TODO: Extract from main.py
-        pass
+        self.start_processing_fn()
 
-    def on_source_changed(self, event=None):
-        """Handle source input change."""
-        # TODO: Extract from main.py
-        pass
-
-    def on_preview_clicked(self):
-        """Handle preview button click."""
-        # TODO: Extract from main.py
-        pass
-
-    def on_fetch_info(self):
-        """Handle fetch video info request."""
-        # TODO: Extract from main.py
-        pass
-
-    def _log_callback(self, message: str):
-        """Callback for progress updates.
+    def on_step_clicked(self, step_num: int):
+        """Handle step button click.
 
         Args:
-            message: Progress message to display
+            step_num: Step number (1-7)
         """
-        # TODO: Extract from main.py
-        pass
+        if self.run_step_fn:
+            self.run_step_fn(step_num)
