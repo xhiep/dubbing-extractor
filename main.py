@@ -47,6 +47,7 @@ from src.components.ui import Button, Input, Label, TextArea, Checkbox
 from src.components.layout import Card, Section, Row, Column
 from src.components.theme import T
 from src.components.hooks import use_tk_state
+from src.controllers import SourceController
 from src.utils.file_utils import is_local_file
 from src.utils.runtime_env import ensure_local_runtime_env
 
@@ -307,7 +308,7 @@ def launch_gui():
     action_frame.pack(fill=tk.X, pady=(0, 16))
 
     start_btn = Button(action_frame, text="▶  Bat Dau Xu Ly",
-                       command=lambda: start_processing(),
+                       command=None,  # Will be set after controller creation
                        bg=T.ACCENT, fg=T.BG_WHITE,
                        width=22, height=2, font=T.FONT_BODY_SEMIBOLD)
     start_btn.pack(side=tk.LEFT, padx=(0, 8))
@@ -920,10 +921,19 @@ def launch_gui():
             _update_step_buttons()
             start_btn.config(state=tk.NORMAL)
 
+    # Create SourceController
+    source_ctrl = SourceController(
+        start_processing_fn=start_processing,
+        run_step_fn=run_up_to_step
+    )
+
+    # Wire start button to controller
+    start_btn.config(command=source_ctrl.on_start_clicked)
+
     # Gán command cho từng nút bước
     for i, btn in enumerate(step_btn_widgets):
         step_num = i + 1
-        btn.config(command=lambda n=step_num: run_up_to_step(n))
+        btn.config(command=lambda n=step_num: source_ctrl.on_step_clicked(n))
 
     # Gán command các nút SRT
     open_srt_btn.config(command=open_srt_external)
