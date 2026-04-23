@@ -4,16 +4,21 @@
 
 Modular architecture with component-based UI.
 """
-import os
-import sys
+
+# ── Standard Library ──────────────────────────────────────────
 import json
-import tkinter as tk
+import os
 import subprocess
+import sys
 from datetime import datetime
-from tkinter import ttk
 from pathlib import Path
+
+# ── Third-Party ───────────────────────────────────────────────
+import tkinter as tk
+from tkinter import ttk
 import winsound
 
+# ── Local Modules ─────────────────────────────────────────────
 # Add src to path
 HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE))
@@ -50,6 +55,7 @@ from src.components.hooks import use_tk_state
 from src.controllers import SourceController, SubtitleController, TtsController, AppController
 from src.utils.file_utils import is_local_file
 from src.utils.runtime_env import ensure_local_runtime_env
+from src.utils.ui_helpers import expand_band_from_center, shift_band
 
 ensure_local_runtime_env()
 
@@ -79,33 +85,6 @@ def _write_app_log_line(message: str) -> None:
             handle.write(f"[{timestamp}] {message}\n")
     except Exception:
         pass
-
-def _expand_band_from_center(top_y: int | None, bottom_y: int | None, frame_height: int, padding_px: int) -> tuple[int | None, int | None]:
-    if top_y is None or bottom_y is None or frame_height <= 0:
-        return None, None
-    center_y = (int(top_y) + int(bottom_y)) / 2.0
-    base_height = max(2, int(bottom_y) - int(top_y) + 1)
-    half_height = base_height / 2.0 + max(0, int(padding_px or 0))
-    new_top = max(0, int(round(center_y - half_height)))
-    new_bottom = min(frame_height - 1, int(round(center_y + half_height)))
-    if new_bottom <= new_top:
-        new_bottom = min(frame_height - 1, new_top + 1)
-    return new_top, new_bottom
-
-def _shift_band(top_y: int | None, bottom_y: int | None, frame_height: int, offset_px: int) -> tuple[int | None, int | None]:
-    if top_y is None or bottom_y is None or frame_height <= 0:
-        return None, None
-    shift = max(-frame_height, min(frame_height, int(offset_px or 0)))
-    height = max(2, int(bottom_y) - int(top_y) + 1)
-    new_top = int(top_y) - shift
-    new_bottom = new_top + height - 1
-    if new_top < 0:
-        new_top = 0
-        new_bottom = min(frame_height - 1, new_top + height - 1)
-    if new_bottom > frame_height - 1:
-        new_bottom = frame_height - 1
-        new_top = max(0, new_bottom - height + 1)
-    return new_top, new_bottom
 
 SUBTITLE_PRESETS = {
     "Tùy Chỉnh": None,
@@ -232,6 +211,9 @@ def _apply_ttk_theme(style: ttk.Style) -> None:
 
 def launch_gui():
     """Launch main GUI application."""
+    # ═══════════════════════════════════════════════════════════
+    # SECTION 1: Window Setup
+    # ═══════════════════════════════════════════════════════════
     root = tk.Tk()
     root.title("Dubbing Extractor v2.5")
     root.geometry("1120x800")
@@ -241,7 +223,10 @@ def launch_gui():
     _apply_ttk_theme(style)
 
     root.configure(bg=T.BG_LIGHT)
-    
+
+    # ═══════════════════════════════════════════════════════════
+    # SECTION 2: Configuration & State Management
+    # ═══════════════════════════════════════════════════════════
     # Load saved config
     app_config = load_app_config()
     legacy_presets = {
@@ -318,7 +303,10 @@ def launch_gui():
                        bg=T.SURFACE_DARK_2, fg=T.BG_WHITE,
                        width=16, height=2, font=T.FONT_BODY)
     clear_btn.pack(side=tk.LEFT)
-    
+
+    # ═══════════════════════════════════════════════════════════
+    # SECTION 3: UI Layout - Notebook & Tabs
+    # ═══════════════════════════════════════════════════════════
     notebook = ttk.Notebook(main_frame)
     notebook.pack(fill=tk.BOTH, expand=True)
 
@@ -383,6 +371,9 @@ def launch_gui():
         for child in widget.winfo_children():
             _bind_scroll_recursive(child)
 
+    # ═══════════════════════════════════════════════════════════
+    # SECTION 4: Source Tab - Video Input & Processing
+    # ═══════════════════════════════════════════════════════════
     # Video source section
     source_card = Card(source_tab, title="📹 Nguồn Video")
     source_container = source_card.get_container()
@@ -932,6 +923,9 @@ def launch_gui():
     save_srt_btn.config(command=save_srt_to_file)
     reset_pipeline_btn.config(command=reset_pipeline)
 
+    # ═══════════════════════════════════════════════════════════
+    # SECTION 5: Adjust Tab - Subtitle Parameters
+    # ═══════════════════════════════════════════════════════════
     # Settings section
     settings_card = Card(adjust_left, title="Cai Dat Phu De Va Vung Che")
     settings_container = settings_card.get_container()
@@ -1058,6 +1052,9 @@ def launch_gui():
 
     settings_card.pack(fill=tk.X, pady=5)
 
+    # ═══════════════════════════════════════════════════════════
+    # SECTION 6: Dub Tab - TTS Configuration
+    # ═══════════════════════════════════════════════════════════
     # Dubbing tab
     dub_card = Card(dub_tab, title="Long Tieng Tieng Viet")
     dub_container = dub_card.get_container()
@@ -1293,6 +1290,9 @@ def launch_gui():
     open_output_btn.pack(anchor=tk.W, pady=(8, 0))
     output_card.pack(fill=tk.X, pady=5)
 
+    # ═══════════════════════════════════════════════════════════
+    # SECTION 7: Log Tab - Output & Status
+    # ═══════════════════════════════════════════════════════════
     # Log section
     log_card = Card(log_tab, title="Nhat Ky Xu Ly")
     log_container = log_card.get_container()
@@ -1613,20 +1613,20 @@ def launch_gui():
             cover_top_y = render_meta.get("cover_top_y")
             cover_bottom_y = render_meta.get("cover_bottom_y")
             if cover_top_y is not None and cover_bottom_y is not None:
-                top_y, bottom_y = _shift_band(int(cover_top_y), int(cover_bottom_y), src_h, cover_offset)
+                top_y, bottom_y = shift_band(int(cover_top_y), int(cover_bottom_y), src_h, cover_offset)
             elif meta_top_y is not None and meta_bottom_y is not None:
-                top_y, bottom_y = _expand_band_from_center(meta_top_y, meta_bottom_y, src_h, blur_padding)
-                top_y, bottom_y = _shift_band(top_y, bottom_y, src_h, cover_offset)
+                top_y, bottom_y = expand_band_from_center(meta_top_y, meta_bottom_y, src_h, blur_padding)
+                top_y, bottom_y = shift_band(top_y, bottom_y, src_h, cover_offset)
             else:
                 approx_bottom = src_h - layout["margin_v"]
                 approx_height = max(layout["font_size"] * 2 + 24, int(src_h * 0.10))
-                top_y, bottom_y = _expand_band_from_center(
+                top_y, bottom_y = expand_band_from_center(
                     int(approx_bottom - approx_height),
                     int(approx_bottom),
                     src_h,
                     blur_padding,
                 )
-                top_y, bottom_y = _shift_band(top_y, bottom_y, src_h, cover_offset)
+                top_y, bottom_y = shift_band(top_y, bottom_y, src_h, cover_offset)
             band_h = max(2, bottom_y - top_y + 1)
             if cover_mode == "blur":
                 power = max(1, min(10, int(blur_power_state.get())))
@@ -2077,22 +2077,22 @@ def launch_gui():
         blur_padding = max(0, int(blur_padding_state.get()))
         cover_offset = int(cover_offset_state.get())
         if meta_video_h > 0 and cover_top_y is not None and cover_bottom_y is not None:
-            preview_cover_top, preview_cover_bottom = _shift_band(int(cover_top_y), int(cover_bottom_y), meta_video_h, cover_offset)
+            preview_cover_top, preview_cover_bottom = shift_band(int(cover_top_y), int(cover_bottom_y), meta_video_h, cover_offset)
             blur_top = video_top + (int(preview_cover_top) / meta_video_h) * canvas_video_h
             blur_bottom = video_top + (int(preview_cover_bottom) / meta_video_h) * canvas_video_h
         elif meta_video_h > 0 and meta_top_y is not None and meta_bottom_y is not None:
-            preview_cover_top, preview_cover_bottom = _expand_band_from_center(meta_top_y, meta_bottom_y, meta_video_h, blur_padding)
-            preview_cover_top, preview_cover_bottom = _shift_band(preview_cover_top, preview_cover_bottom, meta_video_h, cover_offset)
+            preview_cover_top, preview_cover_bottom = expand_band_from_center(meta_top_y, meta_bottom_y, meta_video_h, blur_padding)
+            preview_cover_top, preview_cover_bottom = shift_band(preview_cover_top, preview_cover_bottom, meta_video_h, cover_offset)
             blur_top = video_top + (int(preview_cover_top) / meta_video_h) * canvas_video_h
             blur_bottom = video_top + (int(preview_cover_bottom) / meta_video_h) * canvas_video_h
         else:
-            preview_cover_top, preview_cover_bottom = _expand_band_from_center(
+            preview_cover_top, preview_cover_bottom = expand_band_from_center(
                 int(subtitle_top_canvas),
                 int(subtitle_bottom_canvas),
                 int(canvas_video_h),
                 blur_padding,
             )
-            preview_cover_top, preview_cover_bottom = _shift_band(preview_cover_top, preview_cover_bottom, int(canvas_video_h), cover_offset)
+            preview_cover_top, preview_cover_bottom = shift_band(preview_cover_top, preview_cover_bottom, int(canvas_video_h), cover_offset)
             blur_top = video_top + int(preview_cover_top)
             blur_bottom = video_top + int(preview_cover_bottom)
         blur_top = max(video_top + 6, blur_top)
@@ -2476,6 +2476,9 @@ def launch_gui():
         finally:
             start_btn.config(state=tk.NORMAL)
 
+    # ═══════════════════════════════════════════════════════════
+    # SECTION 8: Controller Initialization & Event Wiring
+    # ═══════════════════════════════════════════════════════════
     # Create SourceController and wire to UI
     source_ctrl = SourceController(
         start_processing_fn=start_processing,
@@ -2510,6 +2513,9 @@ def launch_gui():
         load_config_fn=load_app_config
     )
 
+    # ═══════════════════════════════════════════════════════════
+    # SECTION 9: Start Application
+    # ═══════════════════════════════════════════════════════════
     root.mainloop()
 
 if __name__ == "__main__":

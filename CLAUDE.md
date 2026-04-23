@@ -19,10 +19,12 @@ venv\Scripts\python.exe main.py
 - Dùng PowerShell để gọi: `powershell.exe -Command "& 'C:\Users\xhiep\Downloads\dubbing-extractor\bin\ffmpeg\ffmpeg.exe' ..."`
 
 ## Cấu trúc chính
-- `main.py` — entry point + toàn bộ GUI (Tkinter, ~2481 dòng)
+- `main.py` — entry point + toàn bộ GUI (Tkinter, ~2,522 dòng, organized with section markers)
 - `src/modules/workflow.py` — pipeline xử lý video (download → transcribe → translate → render, ~567 dòng)
 - `src/modules/tts/` — VieNeu-TTS lồng tiếng tiếng Việt
 - `src/components/` — custom UI components (Card, Button, Input, TextArea...)
+- `src/controllers/` — event handlers (Phase 2 extraction)
+- `src/utils/ui_helpers.py` — pure UI geometry helper functions (Phase 3 extraction)
 
 ## Pipeline workflow (process_video)
 Bước 1: Tải video (yt-dlp) hoặc dùng file local
