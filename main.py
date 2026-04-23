@@ -921,19 +921,10 @@ def launch_gui():
             _update_step_buttons()
             start_btn.config(state=tk.NORMAL)
 
-    # Create SourceController
-    source_ctrl = SourceController(
-        start_processing_fn=start_processing,
-        run_step_fn=run_up_to_step
-    )
-
-    # Wire start button to controller
-    start_btn.config(command=source_ctrl.on_start_clicked)
-
-    # Gán command cho từng nút bước
+    # Gán command cho từng nút bước (will be updated after controller creation)
     for i, btn in enumerate(step_btn_widgets):
         step_num = i + 1
-        btn.config(command=lambda n=step_num: source_ctrl.on_step_clicked(n))
+        btn.config(command=lambda n=step_num: run_up_to_step(n))
 
     # Gán command các nút SRT
     open_srt_btn.config(command=open_srt_external)
@@ -2484,7 +2475,21 @@ def launch_gui():
         
         finally:
             start_btn.config(state=tk.NORMAL)
-    
+
+    # Create SourceController and wire to UI
+    source_ctrl = SourceController(
+        start_processing_fn=start_processing,
+        run_step_fn=run_up_to_step
+    )
+
+    # Wire start button to controller
+    start_btn.config(command=source_ctrl.on_start_clicked)
+
+    # Wire step buttons to controller
+    for i, btn in enumerate(step_btn_widgets):
+        step_num = i + 1
+        btn.config(command=lambda n=step_num: source_ctrl.on_step_clicked(n))
+
     root.mainloop()
 
 if __name__ == "__main__":
