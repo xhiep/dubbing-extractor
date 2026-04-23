@@ -3,30 +3,31 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-04-23T15:35:28.491Z"
+last_updated: "2026-04-23T16:07:50.627Z"
 progress:
   total_phases: 4
-  completed_phases: 0
+  completed_phases: 2
   total_plans: 9
-  completed_plans: 2
-  percent: 22
+  completed_plans: 9
+  percent: 100
 ---
 
 # Project State
 
 ## Status: IN PROGRESS
 
-Phase 1 hoàn thành. Đã thực hiện:
+Phase 1 và Phase 2 hoàn thành. Đã thực hiện:
 
 - ✅ Codebase mapping (7 documents)
 - ✅ Research (refactoring patterns)
 - ✅ Requirements definition
 - ✅ Roadmap creation (4 phases)
-- ✅ Phase 1 planning complete (4 plans created)
 - ✅ Phase 1 execution complete (all 4 plans executed)
 - ✅ Phase 1 testing complete (all features working)
+- ✅ Phase 2 execution complete (all 5 plans executed)
+- ✅ Controllers extracted using thin wrapper pattern
 
-**Next**: `/gsd-plan-phase 2` để plan Phase 2 (Extract Controllers)
+**Next**: Manual testing Phase 2, then choose Phase 3 or 4
 
 ## Project Overview
 
@@ -87,17 +88,19 @@ Phase 1 hoàn thành. Đã thực hiện:
 
 ### Phase 2: Extract Controllers (Medium Risk)
 
-**Status**: NOT STARTED  
-**Duration**: 3-4 giờ  
-**Tasks**:
+**Status**: ✅ COMPLETE  
+**Completed**: 2026-04-23  
+**Plans**:
 
-- [ ] Create controller structure (skeleton files)
-- [ ] Extract SourceController
-- [ ] Extract SubtitleController
-- [ ] Extract TtsController
-- [ ] Extract AppController and final testing
+- [x] 01-PLAN.md - Create controller structure (skeleton files)
+- [x] 02-PLAN.md - Extract SourceController (start processing, step-by-step)
+- [x] 03-PLAN.md - Extract SubtitleController (preset, parameters)
+- [x] 04-PLAN.md - Extract TtsController (mode, voice, preview)
+- [x] 05-PLAN.md - Extract AppController (config save/load)
 
-**Ready to plan**: `/gsd-plan-phase 2`
+**Result**: All controllers extracted using thin wrapper pattern. UI events separated from business logic. Ready for manual testing.
+
+**Approach**: Thin wrapper pattern (delegates to existing functions) instead of full extraction to reduce risk.
 
 ### Phase 3: Split main.py Further (Higher Risk)
 
