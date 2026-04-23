@@ -1,0 +1,94 @@
+﻿*** Begin Patch
+*** Update File: src/modules/video_processing/video_encoder.py
+@@ -3,2 +3,3 @@
+ import subprocess
++import tempfile
+ import statistics
+@@ -251,2 +252,3 @@
+ 
++    temp_script_path = None
+     def _make_cmd(use_nvenc: bool) -> tuple[list, str]:
++        nonlocal temp_script_path
+         enc_args, label = _build_enc_args(use_nvenc)
+@@ -266,13 +268,26 @@
+             output_label = "[vout]"
+-        cmd = [
+-            ff, "-y",
+-            "-i", str(src),
+-            "-filter_complex", filter_complex,
+-            "-map", output_label,
+-            "-map", "[aout]" if abs(speed - 1.0) > 0.001 or effective_mode == "none" else "0:a?",
+-            *enc_args,
+-            "-c:a", "aac", "-b:a", "192k",
+-            "-movflags", "+faststart",
+-            str(dst),
+-        ]
++        
++        if len(filter_complex) > 8000:
++            if not temp_script_path:
++                with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
++                    f.write(filter_complex)
++                    temp_script_path = f.name
++            cmd = [
++                ff, "-y",
++                "-i", str(src),
++                "-filter_complex_script", temp_script_path,
++                "-map", output_label,
++                "-map", "[aout]" if abs(speed - 1.0) > 0.001 or effective_mode == "none" else "0:a?",
++                *enc_args,
++                "-c:a", "aac", "-b:a", "192k",
++                "-movflags", "+faststart",
++                str(dst),
++            ]
++        else:
++            cmd = [
++                ff, "-y",
++                "-i", str(src),
++                "-filter_complex", filter_complex,
++                "-map", output_label,
++                "-map", "[aout]" if abs(speed - 1.0) > 0.001 or effective_mode == "none" else "0:a?",
++                *enc_args,
++                "-c:a", "aac", "-b:a", "192k",
++                "-movflags", "+faststart",
++                str(dst),
++            ]
+         return cmd, label
+@@ -281,14 +296,19 @@
+     for attempt_nvenc in ([True, False] if nvenc else [False]):
+-        cmd, label = _make_cmd(attempt_nvenc)
+-        _log(f"->  Encoder: {label}")
+-        _log("->  Dang render video clean...")
+         try:
+-            _run_ff(cmd, log_cb)
+-            _log(f"✓  Video ready: {dst.stat().st_size/1024/1024:.1f} MB")
+-            return meta
+-        except RuntimeError as e:
+-            if attempt_nvenc:
+-                _log("⚠  NVENC that bai, chuyen sang CPU...")
+-                _log(f"   Chi tiet: {str(e)[:220]}")
+-                dst.unlink(missing_ok=True)
+-                continue
+-            raise
++            cmd, label = _make_cmd(attempt_nvenc)
++            _log(f"->  Encoder: {label}")
++            _log("->  Dang render video clean...")
++            try:
++                _run_ff(cmd, log_cb)
++                _log(f"✓  Video ready: {dst.stat().st_size/1024/1024:.1f} MB")
++                if temp_script_path:
++                    Path(temp_script_path).unlink(missing_ok=True)
++                return meta
++            except RuntimeError as e:
++                if attempt_nvenc:
++                    _log("⚠  NVENC that bai, chuyen sang CPU...")
++                    _log(f"   Chi tiet: {str(e)[:220]}")
++                    dst.unlink(missing_ok=True)
++                    continue
++                raise
++        finally:
++            pass
+ 
++    if temp_script_path:
++        Path(temp_script_path).unlink(missing_ok=True)
+     raise RuntimeError("Khong the render video (ca NVENC lan CPU deu that bai).")
+*** End Patch

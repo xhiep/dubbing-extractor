@@ -1,0 +1,50 @@
+# Dubbing Extractor v2 — Claude Context
+
+## Khởi động Claude
+```
+cd C:\Users\xhiep\Downloads\dubbing-extractor
+claude --dangerously-skip-permissions
+```
+
+## Chạy app
+```
+scripts\run.bat
+# hoặc trực tiếp:
+venv\Scripts\python.exe main.py
+```
+
+## ffmpeg
+- Không có ffmpeg trong PATH hệ thống
+- ffmpeg nằm tại: `C:\Users\xhiep\Downloads\dubbing-extractor\bin\ffmpeg\ffmpeg.exe`
+- Dùng PowerShell để gọi: `powershell.exe -Command "& 'C:\Users\xhiep\Downloads\dubbing-extractor\bin\ffmpeg\ffmpeg.exe' ..."`
+
+## Cấu trúc chính
+- `main.py` — entry point + toàn bộ GUI (Tkinter, ~2481 dòng)
+- `src/modules/workflow.py` — pipeline xử lý video (download → transcribe → translate → render, ~567 dòng)
+- `src/modules/tts/` — VieNeu-TTS lồng tiếng tiếng Việt
+- `src/components/` — custom UI components (Card, Button, Input, TextArea...)
+
+## Pipeline workflow (process_video)
+Bước 1: Tải video (yt-dlp) hoặc dùng file local
+Bước 2: Transcribe (Whisper, chạy CPU — RTX 5060 chưa được PyTorch hỗ trợ)
+Bước 3: Dịch sang tiếng Việt (Google Translate)
+Bước 4: Che phụ đề gốc (blur/blackbar/none)
+Bước 5: Xuất SRT, script, song ngữ
+Bước 6: Burn sub vào video (optional)
+Bước 7: Lồng tiếng VieNeu-TTS (optional)
+
+## Tính năng hiện tại
+
+**Hai chế độ xử lý video:**
+1. **Monolithic mode** (nút "Bắt Đầu Xử Lý"): Chạy toàn bộ pipeline một lần
+2. **Step-by-step mode** (7 nút "Bước 1-7"): Chạy từng bước riêng, có thể edit SRT giữa chừng
+
+Cả hai mode đều sử dụng các step functions (step1-7) trong `workflow.py`.
+Step-by-step UI đã hoàn chỉnh với pipeline_state tracking và SRT editor.
+
+Backup đã có tại: `C:\Users\xhiep\Downloads\dubbing-extractor-backup-20260423_1630`
+
+## Lưu ý code
+- Comment tiếng Việt OK, nhưng tên biến/hàm phải tiếng Anh
+- Không sửa trực tiếp `config.json`, `cookies.txt`, thư mục `venv/`, `bin/`, `output/`
+- GPU: RTX 5060 (sm_120) — Whisper dùng CPU, NVENC encoding hoạt động tốt

@@ -1,0 +1,509 @@
+---
+project: Dubbing Extractor - Code Cleanup & Refactoring
+created: 2026-04-23
+status: draft
+---
+
+# Roadmap - Dọn Dẹp & Tái Cấu Trúc
+
+## Tổng Quan
+
+Roadmap gồm 4 phases, thực hiện tuần tự từ low-risk đến higher-risk. Mỗi phase kết thúc với manual testing để đảm bảo không có regression.
+
+**Total Estimate**: 9-13 giờ làm việc tập trung
+
+## Phase 1: Code Cleanup (Low Risk)
+
+**Goal**: Xóa code thừa, dở dang, và cập nhật documentation
+
+**Duration**: 2-3 giờ
+
+**Risk Level**: LOW - Chỉ xóa code không dùng, không thay đổi logic
+
+### Tasks
+
+#### 1.1: Remove WIP Step Functions
+- **File**: `src/modules/workflow.py`
+- **Action**: Xóa `step1_prepare()` through `step7_dub()` (7 functions)
+- **Reason**: Functions tồn tại nhưng không có UI để gọi, không được dùng
+- **Keep**: `process_video()` function (main pipeline)
+- **Lines Saved**: ~200-300 lines
+
+#### 1.2: Remove Pipeline State Dict
+- **File**: `main.py`
+- **Action**: Xóa `pipeline_state` dict declaration và references
+- **Reason**: Declared but never used
+- **Lines Saved**: ~10-20 lines
+
+#### 1.3: Remove Duplicate TTS Checkbox
+- **File**: `main.py` (lines 196-209)
+- **Action**: Xóa duplicate `quick_dub_toggle` checkbox
+- **Reason**: Duplicate control for same setting
+- **Keep**: One checkbox, remove the other
+- **Lines Saved**: ~15 lines
+
+#### 1.4: Remove Commented Code
+- **Files**: All `.py` files
+- **Action**: Search and remove commented-out code blocks
+- **Command**: `grep -r "^#.*def \|^#.*class " src/ main.py`
+- **Exception**: Keep commented explanations, remove commented code
+
+#### 1.5: Remove Unused Imports
+- **Files**: All `.py` files
+- **Action**: Remove imports that are never used
+- **Tool**: `flake8` or manual review
+- **Common culprits**: `import sys`, `import os` when not used
+
+#### 1.6: Update CLAUDE.md
+- **File**: `CLAUDE.md`
+- **Action**: 
+  - Fix line count: main.py ~3000 lines (not ~1760)
+  - Update architecture description if needed
+  - Update "Việc đang làm" section (remove step-by-step UI mention)
+
+#### 1.7: Update Documentation Line Counts
+- **Files**: `README.md`, `DESIGN.md`
+- **Action**: Verify and update any line counts or file references
+- **Check**: All file paths are correct
+
+### Success Criteria
+- ✅ No unused functions remain
+- ✅ No commented-out code blocks
+- ✅ No unused imports (flake8 clean)
+- ✅ Documentation accurate
+- ✅ All features still work (manual test)
+
+### Testing
+- Run app: `scripts\run.bat`
+- Quick smoke test: Load video, check all tabs open
+- Full test: Run one complete pipeline (download → dub)
+
+### Deliverables
+- Cleaned `src/modules/workflow.py` (step functions removed)
+- Cleaned `main.py` (duplicates removed, ~200 lines saved)
+- Updated `CLAUDE.md`
+- Testing report: "Phase 1 complete, all features working"
+
+---
+
+## Phase 2: Extract Controllers (Medium Risk)
+
+**Goal**: Tách event handlers ra khỏi main.py vào controller classes
+
+**Duration**: 3-4 giờ
+
+**Risk Level**: MEDIUM - Di chuyển code, có thể break event handling
+
+### Tasks
+
+#### 2.1: Create Controller Structure
+- **Action**: Tạo `src/controllers/` directory
+- **Files**:
+  ```
+  src/controllers/
+    __init__.py
+    app_controller.py
+    source_controller.py
+    subtitle_controller.py
+    tts_controller.py
+  ```
+
+#### 2.2: Design Controller Pattern
+- **Pattern**: Controller nhận widget references, gọi modules, update UI
+- **Example**:
+  ```python
+  class SourceController:
+      def __init__(self, widgets, config):
+          self.widgets = widgets
+          self.config = config
+      
+      def on_start_clicked(self):
+          source = self.widgets.source_input.get()
+          # Call business logic
+          result = process_video(source, ...)
+          # Update UI
+          self.widgets.log_area.append(result)
+  ```
+
+#### 2.3: Extract Source Tab Handlers
+- **File**: `src/controllers/source_controller.py`
+- **Move from main.py**:
+  - `on_start_clicked()` - Start processing button
+  - `on_source_changed()` - Source input change handler
+  - `on_preview_clicked()` - Preview button
+  - Related helper functions
+
+#### 2.4: Extract Subtitle Tab Handlers
+- **File**: `src/controllers/subtitle_controller.py`
+- **Move from main.py**:
+  - `on_cover_mode_changed()` - Cover mode selection
+  - `on_preview_subtitle()` - Subtitle preview
+  - `on_blur_params_changed()` - Blur parameter adjustments
+  - Related helper functions
+
+#### 2.5: Extract TTS Tab Handlers
+- **File**: `src/controllers/tts_controller.py`
+- **Move from main.py**:
+  - `on_dub_mode_changed()` - TTS mode selection
+  - `on_voice_changed()` - Voice selection
+  - `on_tts_preview()` - TTS preview
+  - Related helper functions
+
+#### 2.6: Create App Controller
+- **File**: `src/controllers/app_controller.py`
+- **Purpose**: Coordinate between controllers, handle app-level events
+- **Responsibilities**:
+  - Config save/load
+  - Window close handler
+  - Cross-tab coordination
+
+#### 2.7: Update main.py
+- **Action**: Import controllers, wire up event handlers
+- **Pattern**:
+  ```python
+  from src.controllers import SourceController, SubtitleController, TtsController
+  
+  # Create controllers
+  source_ctrl = SourceController(source_widgets, config)
+  subtitle_ctrl = SubtitleController(subtitle_widgets, config)
+  tts_ctrl = TtsController(tts_widgets, config)
+  
+  # Wire up events
+  start_button.config(command=source_ctrl.on_start_clicked)
+  ```
+
+### Success Criteria
+- ✅ All event handlers moved to controllers
+- ✅ main.py < 2000 lines (from ~3000)
+- ✅ Controllers are thin (no business logic)
+- ✅ All UI interactions still work
+- ✅ No regressions in functionality
+
+### Testing
+- **Full Manual Test**: Run complete pipeline
+- **UI Test**: Click every button, change every input
+- **Config Test**: Save/load config, verify persistence
+- **Error Test**: Try invalid inputs, verify error handling
+
+### Deliverables
+- `src/controllers/` with 4 controller files
+- Updated `main.py` (~2000 lines, down from ~3000)
+- Testing report: "Phase 2 complete, all features working"
+
+---
+
+## Phase 3: Split main.py Further (Higher Risk)
+
+**Goal**: Tách tab creation và layout logic ra separate files
+
+**Duration**: 2-3 giờ
+
+**Risk Level**: MEDIUM-HIGH - Thay đổi structure, có thể break layout
+
+### Tasks
+
+#### 3.1: Create Views Structure
+- **Action**: Tạo `src/views/` directory (optional, nếu cần)
+- **Files**:
+  ```
+  src/views/
+    __init__.py
+    main_window.py
+    tabs/
+      __init__.py
+      source_tab.py
+      subtitle_tab.py
+      tts_tab.py
+  ```
+
+#### 3.2: Extract Tab Creation Functions
+- **Option A**: Keep in main.py, just organize better
+- **Option B**: Move to `src/views/tabs/`
+
+**Recommendation**: Option A (safer) - Organize in main.py with clear sections
+
+#### 3.3: Reorganize main.py Structure
+- **Target Structure**:
+  ```python
+  # main.py (~1000-1500 lines)
+  
+  # Imports
+  import ...
+  
+  # Constants
+  LOG_DIR = ...
+  
+  # Helper Functions (keep minimal)
+  def _rotate_log(): ...
+  
+  # Tab Creation Functions
+  def create_source_tab(parent, controllers): ...
+  def create_subtitle_tab(parent, controllers): ...
+  def create_tts_tab(parent, controllers): ...
+  
+  # Main Application Class
+  class DubbingExtractorApp:
+      def __init__(self):
+          self.setup_window()
+          self.create_controllers()
+          self.create_tabs()
+      
+      def setup_window(self): ...
+      def create_controllers(self): ...
+      def create_tabs(self): ...
+      def run(self): ...
+  
+  # Entry Point
+  if __name__ == "__main__":
+      app = DubbingExtractorApp()
+      app.run()
+  ```
+
+#### 3.4: Extract Helper Functions
+- **Move to**: `src/utils/ui_helpers.py`
+- **Candidates**:
+  - `_expand_band_from_center()`
+  - `_shift_band()`
+  - Other UI calculation helpers
+
+#### 3.5: Clean Up Imports
+- **Action**: Organize imports by category
+- **Order**: stdlib → third-party → local
+- **Tool**: `isort` (optional)
+
+### Success Criteria
+- ✅ main.py < 1500 lines (target achieved)
+- ✅ Clear structure with sections
+- ✅ Helper functions extracted
+- ✅ All features still work
+- ✅ Layout unchanged
+
+### Testing
+- **Visual Test**: Compare UI before/after (should be identical)
+- **Full Pipeline Test**: Run complete workflow
+- **Resize Test**: Resize window, verify layout adapts
+- **Tab Test**: Switch between tabs, verify all controls
+
+### Deliverables
+- Reorganized `main.py` (~1000-1500 lines)
+- `src/utils/ui_helpers.py` (if created)
+- Testing report: "Phase 3 complete, UI identical, all features working"
+
+---
+
+## Phase 4: Quality Improvements (Ongoing)
+
+**Goal**: Cải thiện error handling, logging, type hints, documentation
+
+**Duration**: 2-3 giờ
+
+**Risk Level**: LOW-MEDIUM - Improvements, not restructuring
+
+### Tasks
+
+#### 4.1: Improve Error Handling
+- **Files**: All modules in `src/modules/`
+- **Action**: Replace `except Exception: pass` with proper handling
+- **Pattern**:
+  ```python
+  try:
+      operation()
+  except SpecificError as e:
+      logger.error(f"Operation failed: {e}", exc_info=True)
+      # Inform user or retry
+  ```
+- **Focus Areas**:
+  - `src/modules/workflow.py` - Pipeline errors
+  - `src/modules/downloader/` - Network errors
+  - `src/modules/transcription/` - Whisper errors
+  - `src/modules/tts/` - TTS errors
+
+#### 4.2: Add Structured Logging
+- **File**: `src/utils/logger.py` (create new)
+- **Setup**:
+  ```python
+  import logging
+  from logging.handlers import RotatingFileHandler
+  
+  def setup_logging():
+      logger = logging.getLogger('dubbing_extractor')
+      logger.setLevel(logging.INFO)
+      
+      # File handler
+      fh = RotatingFileHandler(
+          'output/app.log',
+          maxBytes=10*1024*1024,  # 10MB
+          backupCount=3
+      )
+      fh.setFormatter(logging.Formatter(
+          '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+      ))
+      logger.addHandler(fh)
+      
+      return logger
+  ```
+- **Usage**: Replace print statements with logger calls
+
+#### 4.3: Add Type Hints
+- **Files**: All public functions in `src/modules/`, `src/controllers/`
+- **Tool**: `mypy` for verification
+- **Priority**:
+  1. `src/modules/workflow.py` - Main pipeline
+  2. `src/controllers/` - All controllers
+  3. `src/modules/transcription/` - Transcription modules
+  4. `src/modules/tts/` - TTS modules
+
+#### 4.4: Add Docstrings
+- **Style**: Google style
+- **Coverage**: All public functions
+- **Example**:
+  ```python
+  def process_video(
+      source_input: str,
+      cover_mode: str = "blur",
+      log_cb: Optional[Callable[[str], None]] = None
+  ) -> Dict[str, Path]:
+      """Xử lý video qua toàn bộ pipeline.
+      
+      Args:
+          source_input: URL hoặc đường dẫn file local
+          cover_mode: Chế độ che phụ đề (blur/blackbar/none)
+          log_cb: Callback tùy chọn để log tiến trình
+          
+      Returns:
+          Dict chứa đường dẫn các file output (video, srt, scripts)
+          
+      Raises:
+          ValueError: Khi source_input hoặc cover_mode không hợp lệ
+          RuntimeError: Khi xử lý thất bại
+      """
+  ```
+
+#### 4.5: Improve Resource Cleanup
+- **Files**: `src/modules/transcription/whisper_engine.py`, `src/modules/tts/vieneu_engine.py`
+- **Action**: Ensure all resources cleaned up properly
+- **Pattern**: Use context managers where possible
+- **Verify**: No memory leaks after repeated operations
+
+#### 4.6: Update All Documentation
+- **Files**: `CLAUDE.md`, `README.md`, `DESIGN.md`
+- **Action**: Final pass to ensure accuracy
+- **Check**:
+  - Line counts correct
+  - Architecture description matches code
+  - File paths correct
+  - No outdated information
+
+#### 4.7: Create CHANGELOG
+- **File**: `CHANGELOG.md` (new)
+- **Content**: Document all changes made during refactoring
+- **Format**:
+  ```markdown
+  # Changelog
+  
+  ## [Refactoring] - 2026-04-23
+  
+  ### Changed
+  - Refactored main.py from 3000 to 1500 lines
+  - Extracted event handlers to controllers
+  - Improved error handling throughout
+  
+  ### Removed
+  - Unused step1-7 functions
+  - Duplicate TTS checkbox
+  - Commented-out code
+  
+  ### Added
+  - Type hints for public APIs
+  - Structured logging
+  - Docstrings for public functions
+  ```
+
+### Success Criteria
+- ✅ No `except Exception: pass` without justification
+- ✅ Structured logging in place
+- ✅ Type hints on all public APIs (mypy clean)
+- ✅ Docstrings on all public functions
+- ✅ Documentation accurate and complete
+- ✅ CHANGELOG created
+
+### Testing
+- **Mypy Check**: `mypy src/` (no errors on public APIs)
+- **Flake8 Check**: `flake8 src/ main.py` (clean)
+- **Manual Test**: Full pipeline one more time
+- **Log Review**: Check `output/app.log` for proper logging
+
+### Deliverables
+- Improved error handling across all modules
+- `src/utils/logger.py` with structured logging
+- Type hints on all public APIs
+- Docstrings on all public functions
+- Updated documentation
+- `CHANGELOG.md`
+- Final testing report: "Phase 4 complete, all quality improvements done"
+
+---
+
+## Summary
+
+### Before Refactoring
+- main.py: ~3,000 lines
+- Dead code: step1-7 functions, pipeline_state, duplicates
+- Error handling: Inconsistent, many silent failures
+- Type hints: Partial
+- Documentation: Some inaccuracies
+
+### After Refactoring
+- main.py: ~1,000-1,500 lines (50% reduction)
+- Dead code: None
+- Error handling: Consistent, proper logging
+- Type hints: 100% on public APIs
+- Documentation: Accurate and complete
+- Structure: Clear separation (controllers, modules, components)
+
+### Metrics
+
+| Metric | Before | After | Improvement |
+|--------|--------|-------|-------------|
+| main.py lines | ~3,000 | ~1,500 | 50% reduction |
+| Dead code | Yes | None | 100% removed |
+| Type hints | Partial | 100% public | Full coverage |
+| Error handling | Inconsistent | Consistent | Standardized |
+| Documentation | Some errors | Accurate | Updated |
+
+### Risk Mitigation
+
+**Backup Strategy**:
+- Existing backup: `C:\Users\xhiep\Downloads\dubbing-extractor-backup-20260423_1630`
+- Create new backup before each phase
+- Keep incremental backups
+
+**Testing Strategy**:
+- Manual testing after each phase
+- Full pipeline test after each phase
+- Visual comparison for UI changes
+- Config compatibility test
+
+**Rollback Plan**:
+- If phase fails: restore from backup
+- If bug found: fix immediately or rollback
+- Document any issues encountered
+
+---
+
+## Next Steps
+
+**After Roadmap Approval**:
+1. Review and approve this roadmap
+2. Create backup before starting
+3. Run `/gsd-plan-phase 1` to start Phase 1
+4. Execute phases sequentially
+5. Test thoroughly after each phase
+6. Document any deviations or issues
+
+**Future Work** (Out of Scope):
+- Add threading/async for long operations
+- Add automated tests (unit, integration)
+- Complete step-by-step UI (if desired)
+- Performance optimization
+- Add more features
