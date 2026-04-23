@@ -236,131 +236,28 @@ Plans:
 
 ## Phase 4: Quality Improvements (Ongoing)
 
-**Goal**: Cải thiện error handling, logging, type hints, documentation
+**Goal**: Improve error handling, logging, type hints, and documentation
 
 **Duration**: 2-3 giờ
 
 **Risk Level**: LOW-MEDIUM - Improvements, not restructuring
 
-### Tasks
+**Plans:** 4 plans
 
-#### 4.1: Improve Error Handling
-- **Files**: All modules in `src/modules/`
-- **Action**: Replace `except Exception: pass` with proper handling
-- **Pattern**:
-  ```python
-  try:
-      operation()
-  except SpecificError as e:
-      logger.error(f"Operation failed: {e}", exc_info=True)
-      # Inform user or retry
-  ```
-- **Focus Areas**:
-  - `src/modules/workflow.py` - Pipeline errors
-  - `src/modules/downloader/` - Network errors
-  - `src/modules/transcription/` - Whisper errors
-  - `src/modules/tts/` - TTS errors
+Plans:
+- [ ] 04-01-PLAN.md — Structured logging and error handling improvements
+- [ ] 04-02-PLAN.md — Add type hints to all public APIs
+- [ ] 04-03-PLAN.md — Add docstrings and improve resource cleanup
+- [ ] 04-04-PLAN.md — Update documentation and create CHANGELOG
 
-#### 4.2: Add Structured Logging
-- **File**: `src/utils/logger.py` (create new)
-- **Setup**:
-  ```python
-  import logging
-  from logging.handlers import RotatingFileHandler
-  
-  def setup_logging():
-      logger = logging.getLogger('dubbing_extractor')
-      logger.setLevel(logging.INFO)
-      
-      # File handler
-      fh = RotatingFileHandler(
-          'output/app.log',
-          maxBytes=10*1024*1024,  # 10MB
-          backupCount=3
-      )
-      fh.setFormatter(logging.Formatter(
-          '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-      ))
-      logger.addHandler(fh)
-      
-      return logger
-  ```
-- **Usage**: Replace print statements with logger calls
+### Wave Structure
 
-#### 4.3: Add Type Hints
-- **Files**: All public functions in `src/modules/`, `src/controllers/`
-- **Tool**: `mypy` for verification
-- **Priority**:
-  1. `src/modules/workflow.py` - Main pipeline
-  2. `src/controllers/` - All controllers
-  3. `src/modules/transcription/` - Transcription modules
-  4. `src/modules/tts/` - TTS modules
-
-#### 4.4: Add Docstrings
-- **Style**: Google style
-- **Coverage**: All public functions
-- **Example**:
-  ```python
-  def process_video(
-      source_input: str,
-      cover_mode: str = "blur",
-      log_cb: Optional[Callable[[str], None]] = None
-  ) -> Dict[str, Path]:
-      """Xử lý video qua toàn bộ pipeline.
-      
-      Args:
-          source_input: URL hoặc đường dẫn file local
-          cover_mode: Chế độ che phụ đề (blur/blackbar/none)
-          log_cb: Callback tùy chọn để log tiến trình
-          
-      Returns:
-          Dict chứa đường dẫn các file output (video, srt, scripts)
-          
-      Raises:
-          ValueError: Khi source_input hoặc cover_mode không hợp lệ
-          RuntimeError: Khi xử lý thất bại
-      """
-  ```
-
-#### 4.5: Improve Resource Cleanup
-- **Files**: `src/modules/transcription/whisper_engine.py`, `src/modules/tts/vieneu_engine.py`
-- **Action**: Ensure all resources cleaned up properly
-- **Pattern**: Use context managers where possible
-- **Verify**: No memory leaks after repeated operations
-
-#### 4.6: Update All Documentation
-- **Files**: `CLAUDE.md`, `README.md`, `DESIGN.md`
-- **Action**: Final pass to ensure accuracy
-- **Check**:
-  - Line counts correct
-  - Architecture description matches code
-  - File paths correct
-  - No outdated information
-
-#### 4.7: Create CHANGELOG
-- **File**: `CHANGELOG.md` (new)
-- **Content**: Document all changes made during refactoring
-- **Format**:
-  ```markdown
-  # Changelog
-  
-  ## [Refactoring] - 2026-04-23
-  
-  ### Changed
-  - Refactored main.py from 3000 to 1500 lines
-  - Extracted event handlers to controllers
-  - Improved error handling throughout
-  
-  ### Removed
-  - Unused step1-7 functions
-  - Duplicate TTS checkbox
-  - Commented-out code
-  
-  ### Added
-  - Type hints for public APIs
-  - Structured logging
-  - Docstrings for public functions
-  ```
+| Wave | Plans | Autonomous |
+|------|-------|------------|
+| 1 | 04-01 | yes |
+| 2 | 04-02 | yes |
+| 3 | 04-03 | yes |
+| 4 | 04-04 | no (has checkpoint) |
 
 ### Success Criteria
 - ✅ No `except Exception: pass` without justification
@@ -384,6 +281,8 @@ Plans:
 - Updated documentation
 - `CHANGELOG.md`
 - Final testing report: "Phase 4 complete, all quality improvements done"
+
+---
 
 ---
 
