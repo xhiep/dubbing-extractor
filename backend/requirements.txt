@@ -1,0 +1,20 @@
+# FastAPI Backend Dependencies
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-socketio==5.11.0
+python-multipart==0.0.6
+pydantic==2.5.3
+pydantic-settings==2.1.0
+
+# Background Tasks
+celery==5.3.6
+redis==5.0.1
+
+# Existing dependencies (reused from main app)
+# These are already in the main venv, just documenting here
+# yt-dlp
+# openai-whisper
+# googletrans==4.0.0rc1
+# torch
+# torchaudio
+# psutil
