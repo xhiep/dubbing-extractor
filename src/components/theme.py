@@ -49,6 +49,12 @@ class T:
     BG_LOG = "#1d1d1f"
     FG_LOG = "#e0e0e5"
 
+    # State colors (for notifications, alerts, status indicators)
+    SUCCESS = "#34c759"      # Green - success states
+    WARNING = "#ff9500"      # Orange - warning states
+    ERROR = "#ff3b30"        # Red - error states
+    INFO = "#0071e3"         # Blue - info states
+
     # ── Typography (Tkinter font tuples) ────────────────────────────────────
     # Display — SF Pro Display / Segoe UI, large sizes
     FONT_HERO = (_D, 20, "bold")       # Window title
@@ -71,3 +77,107 @@ class T:
     SPACE_MD = 16
     SPACE_LG = 24
     SPACE_XL = 32
+
+
+class DarkTheme:
+    """Dark mode design tokens."""
+
+    # ── Colors ──────────────────────────────────────────────────────────────
+    # Backgrounds
+    BG_DARK = "#000000"
+    BG_LIGHT = "#1d1d1f"      # Main background in dark mode
+    BG_WHITE = "#2c2c2e"      # Input fields, text areas
+    BG_CARD_DARK = "#1c1c1e"  # Cards
+
+    # Surfaces
+    SURFACE_DARK_1 = "#2c2c2e"
+    SURFACE_DARK_2 = "#3a3a3c"
+
+    # Text
+    TEXT_PRIMARY = "#ffffff"
+    TEXT_SECONDARY = "#98989d"
+    TEXT_DISABLED = "#636366"
+    TEXT_ON_DARK = "#ffffff"
+    TEXT_ON_DARK_SEC = "#98989d"
+
+    # Interactive
+    ACCENT = "#0a84ff"          # Brighter blue for dark mode
+    ACCENT_HOVER = "#409cff"
+    ACCENT_DARK = "#0a84ff"
+    LINK = "#2997ff"
+
+    # Structure
+    BORDER = "#38383a"
+    BORDER_FOCUS = "#0a84ff"
+
+    # Log area
+    BG_LOG = "#000000"
+    FG_LOG = "#e5e5ea"
+
+    # State colors (same as light mode)
+    SUCCESS = "#32d74b"      # Slightly brighter green for dark mode
+    WARNING = "#ff9f0a"      # Slightly brighter orange
+    ERROR = "#ff453a"        # Slightly brighter red
+    INFO = "#0a84ff"         # Brighter blue
+
+    # Typography (same as light mode)
+    FONT_HERO = T.FONT_HERO
+    FONT_SECTION = T.FONT_SECTION
+    FONT_CARD_TITLE = T.FONT_CARD_TITLE
+    FONT_LABEL = T.FONT_LABEL
+    FONT_BODY = T.FONT_BODY
+    FONT_BODY_SEMIBOLD = T.FONT_BODY_SEMIBOLD
+    FONT_SMALL = T.FONT_SMALL
+    FONT_CAPTION = T.FONT_CAPTION
+    FONT_MONO = T.FONT_MONO
+
+    # Spacing (same as light mode)
+    SPACE_XS = T.SPACE_XS
+    SPACE_SM = T.SPACE_SM
+    SPACE_MD = T.SPACE_MD
+    SPACE_LG = T.SPACE_LG
+    SPACE_XL = T.SPACE_XL
+
+
+class ThemeManager:
+    """Manages theme switching between light and dark modes."""
+
+    def __init__(self):
+        self._current_theme = T  # Default to light theme
+        self._is_dark = False
+
+    @property
+    def current(self):
+        """Get current theme."""
+        return self._current_theme
+
+    @property
+    def is_dark(self) -> bool:
+        """Check if dark mode is active."""
+        return self._is_dark
+
+    def toggle(self):
+        """Toggle between light and dark themes."""
+        if self._is_dark:
+            self._current_theme = T
+            self._is_dark = False
+        else:
+            self._current_theme = DarkTheme
+            self._is_dark = True
+        return self._current_theme
+
+    def set_light(self):
+        """Set light theme."""
+        self._current_theme = T
+        self._is_dark = False
+        return self._current_theme
+
+    def set_dark(self):
+        """Set dark theme."""
+        self._current_theme = DarkTheme
+        self._is_dark = True
+        return self._current_theme
+
+
+# Global theme manager instance
+theme_manager = ThemeManager()

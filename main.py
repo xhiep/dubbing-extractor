@@ -53,6 +53,10 @@ from src.components.ui import Button, Input, Label, TextArea, Checkbox
 from src.components.layout import Card, Section, Row, Column
 from src.components.theme import T
 from src.components.hooks import use_tk_state
+from src.components.toast import ToastManager
+from src.components.loading import LoadingSpinner, LoadingOverlay
+from src.components.enhanced_progress import EnhancedProgressBar
+from src.components.animations import HoverEffect
 from src.controllers import SourceController, SubtitleController, TtsController, AppController
 from src.views import LogView, DubView, SourceView, AdjustView
 from src.utils.file_utils import is_local_file
@@ -226,6 +230,42 @@ def launch_gui():
 
     root.configure(bg=T.BG_LIGHT)
 
+    # Initialize ToastManager for notifications
+    # DISABLED: Causing lag issues
+    # toast = ToastManager(root)
+
+    # Status notification system using pipeline_status_label
+    class StatusNotifier:
+        def __init__(self):
+            self.status_label = None
+            self.status_var = None
+
+        def set_widgets(self, status_var, status_label):
+            self.status_var = status_var
+            self.status_label = status_label
+
+        def success(self, msg, duration=3000):
+            if self.status_var and self.status_label:
+                self.status_var.set(f"✓ {msg}")
+                self.status_label.config(fg="#27ae60")
+
+        def error(self, msg, duration=3000):
+            if self.status_var and self.status_label:
+                self.status_var.set(f"❌ {msg}")
+                self.status_label.config(fg="#e74c3c")
+
+        def warning(self, msg, duration=3000):
+            if self.status_var and self.status_label:
+                self.status_var.set(f"⚠ {msg}")
+                self.status_label.config(fg="#e67e22")
+
+        def info(self, msg, duration=3000):
+            if self.status_var and self.status_label:
+                self.status_var.set(f"ℹ {msg}")
+                self.status_label.config(fg="#3498db")
+
+    toast = StatusNotifier()
+
     # ═══════════════════════════════════════════════════════════
     # SECTION 2: Configuration & State Management
     # ═══════════════════════════════════════════════════════════
@@ -280,6 +320,10 @@ def launch_gui():
     main_frame = tk.Frame(root, padx=16, pady=16, bg=T.BG_LIGHT)
     main_frame.pack(fill=tk.BOTH, expand=True)
 
+    # Create loading overlay (hidden by default)
+    loading_overlay = LoadingOverlay(root, message="Đang xử lý...")
+    loading_overlay.place_forget()  # Hide initially
+
     # ── Title bar ──────────────────────────────────────────────────────────
     title_frame = tk.Frame(main_frame, bg=T.BG_LIGHT)
     title_frame.pack(pady=(0, 16))
@@ -299,12 +343,14 @@ def launch_gui():
                        bg=T.ACCENT, fg=T.BG_WHITE,
                        width=22, height=2, font=T.FONT_BODY_SEMIBOLD)
     start_btn.pack(side=tk.LEFT, padx=(0, 8))
+    HoverEffect(start_btn, T.ACCENT_HOVER, T.ACCENT)
 
     clear_btn = Button(action_frame, text="Xoa Nhat Ky",
                        command=lambda: log_area.clear(),
                        bg=T.SURFACE_DARK_2, fg=T.BG_WHITE,
                        width=16, height=2, font=T.FONT_BODY)
     clear_btn.pack(side=tk.LEFT)
+    HoverEffect(clear_btn, "#3a3a3c", T.SURFACE_DARK_2)
 
     # ═══════════════════════════════════════════════════════════
     # SECTION 3: UI Layout - Notebook & Tabs
@@ -421,6 +467,9 @@ def launch_gui():
     STEP_COLOR_RUNNING = source_widgets['STEP_COLOR_RUNNING']
     STEP_COLOR_DONE = source_widgets['STEP_COLOR_DONE']
     STEP_COLOR_ERROR = source_widgets['STEP_COLOR_ERROR']
+
+    # Connect toast notifier to pipeline status widgets
+    toast.set_widgets(pipeline_status_var, pipeline_status_label)
 
     # ── Hàm hỗ trợ pipeline ─────────────────────────────────────────────
 
@@ -540,14 +589,35 @@ def launch_gui():
         source = p["source_input"]
         if not source:
             log("[ERROR] Vui lòng nhập link video hoặc đường dẫn file")
+            toast.error("Vui lòng nhập link video hoặc đường dẫn file")
             return
+
+        # Validate local file
+        if is_local_file(source):
+            source_path = Path(source)
+            if not source_path.exists():
+                log(f"[ERROR] File không tồn tại: {source}")
+                toast.error("File không tồn tại")
+                return
+            if source_path.is_dir():
+                log(f"[ERROR] Đây là thư mục, không phải file video: {source}")
+                toast.error("Vui lòng chọn file video, không phải thư mục")
+                return
+            # Check video extension
+            valid_extensions = {'.mp4', '.avi', '.mkv', '.mov', '.flv', '.wmv', '.webm', '.m4v', '.mpg', '.mpeg'}
+            if source_path.suffix.lower() not in valid_extensions:
+                log(f"[ERROR] File không phải định dạng video hợp lệ: {source_path.suffix}")
+                toast.error(f"File không phải video hợp lệ ({source_path.suffix})")
+                return
 
         # Validate dub nếu target_step == 5
         if target_step == 5 and p["enable_dub"]:
             backend_mode = p["dub_backend_mode"]
             remote_api_base = p["dub_remote_api_base"]
             if not is_vieneu_available(engine_mode=backend_mode, remote_api_base=remote_api_base):
-                log(f"[ERROR] VieNeu-TTS chưa sẵn sàng: {get_vieneu_error(engine_mode=backend_mode, remote_api_base=remote_api_base)}")
+                error_msg = get_vieneu_error(engine_mode=backend_mode, remote_api_base=remote_api_base)
+                log(f"[ERROR] VieNeu-TTS chưa sẵn sàng: {error_msg}")
+                toast.error(f"VieNeu-TTS chưa sẵn sàng: {error_msg}")
                 notebook.select(dub_tab)
                 return
 
@@ -555,6 +625,11 @@ def launch_gui():
         for btn in step_btn_widgets:
             btn.config(state=tk.DISABLED)
         start_btn.config(state=tk.DISABLED)
+
+        # Show loading overlay
+        loading_overlay.update_message(f"Đang chạy bước {target_step}...")
+        loading_overlay.show()
+        root.update()
 
         try:
             # ── Bước 1: Tải video ────────────────────────────────────────
@@ -567,8 +642,10 @@ def launch_gui():
                     pipeline_state.update(result1)
                     pipeline_state["current_step"] = 1
                     _set_pipeline_status(f"✓ Bước 1 xong: {Path(result1['raw_video']).name}", "#27ae60")
+                    toast.success(f"Bước 1 hoàn thành: Video đã tải xong")
                 except Exception as exc:
                     log(f"[ERROR] Bước 1 thất bại: {exc}")
+                    toast.error(f"Bước 1 thất bại: {exc}")
                     _mark_step_error(1)
                     _set_pipeline_status(f"❌ Bước 1 thất bại: {exc}", "#e74c3c")
                     return
@@ -587,8 +664,10 @@ def launch_gui():
                     pipeline_state["segs"] = segs
                     pipeline_state["current_step"] = 2
                     _set_pipeline_status(f"✓ Bước 2 xong: {len(segs)} đoạn nhận dạng.", "#27ae60")
+                    toast.success(f"Bước 2 hoàn thành: Nhận dạng {len(segs)} đoạn")
                 except Exception as exc:
                     log(f"[ERROR] Bước 2 thất bại: {exc}")
+                    toast.error(f"Bước 2 thất bại: {exc}")
                     _mark_step_error(2)
                     _set_pipeline_status(f"❌ Bước 2 thất bại: {exc}", "#e74c3c")
                     return
@@ -612,6 +691,7 @@ def launch_gui():
                     pipeline_state["segs_vi"] = segs_vi
                     pipeline_state["current_step"] = 3
                     _set_pipeline_status(f"✓ Bước 3 xong: {len(segs_vi)} đoạn đã dịch. Hãy kiểm tra và sửa bản dịch bên dưới.", "#27ae60")
+                    toast.success(f"Bước 3 hoàn thành: Đã dịch {len(segs_vi)} đoạn")
                     # Ghi SRT tạm để user xem/sửa
                     temp_srt = Path(pipeline_state["out_dir"]) / "file_sub_viet.srt"
                     from src.modules.transcription.srt_generator import write_srt
@@ -621,6 +701,7 @@ def launch_gui():
                     notebook.select(source_tab)
                 except Exception as exc:
                     log(f"[ERROR] Bước 3 thất bại: {exc}")
+                    toast.error(f"Bước 3 thất bại: {exc}")
                     _mark_step_error(3)
                     _set_pipeline_status(f"❌ Bước 3 thất bại: {exc}", "#e74c3c")
                     return
@@ -690,8 +771,10 @@ def launch_gui():
                     last_output_var.set(out_dir_result)
                     load_preview_segments(out_dir_result)
                     _set_pipeline_status("✓ Bước 4 xong: Video đã render, SRT đã xuất.", "#27ae60")
+                    toast.success("Bước 4 hoàn thành: Video đã render xong")
                 except Exception as exc:
                     log(f"[ERROR] Bước 4 thất bại: {exc}")
+                    toast.error(f"Bước 4 thất bại: {exc}")
                     _mark_step_error(4)
                     _set_pipeline_status(f"❌ Bước 4 thất bại: {exc}", "#e74c3c")
                     return
@@ -748,14 +831,18 @@ def launch_gui():
                 pipeline_state["current_step"] = 5
                 _set_pipeline_status("✅ Hoàn tất! Tất cả các bước đã xong.", "#27ae60")
                 log(f"[SUCCESS] Output: {pipeline_state['out_dir']}")
+                toast.success("Hoàn thành! Tất cả các bước đã xong", duration=5000)
                 notebook.select(adjust_tab)
 
             except Exception as exc:
                 log(f"[ERROR] Bước 5 thất bại: {exc}")
+                toast.error(f"Bước 5 thất bại: {exc}")
                 _mark_step_error(5)
                 _set_pipeline_status(f"❌ Bước 5 thất bại: {exc}", "#e74c3c")
 
         finally:
+            # Hide loading overlay
+            loading_overlay.hide()
             _update_step_buttons()
             start_btn.config(state=tk.NORMAL)
 
@@ -1854,43 +1941,79 @@ def launch_gui():
     preview_canvas.bind("<Enter>", lambda _e: preview_guard.__setitem__("over_preview", True))
     preview_canvas.bind("<Leave>", lambda _e: preview_guard.__setitem__("over_preview", False))
     preview_canvas.config(cursor="hand2")
-    notebook.bind("<<NotebookTabChanged>>", lambda e: load_source_preview(force=False) if notebook.tab(notebook.select(), "text") == "Căn Chỉnh" else None)
+
+    # Lazy load TTS voices when switching to Dub tab
+    tts_loaded = {"loaded": False}
+    def on_tab_changed(event):
+        current_tab = notebook.tab(notebook.select(), "text").strip()
+        if current_tab == "Căn Chỉnh":
+            load_source_preview(force=False)
+        elif current_tab == "Long Tieng" and not tts_loaded["loaded"]:
+            tts_loaded["loaded"] = True
+            root.after(100, refresh_voice_list)
+
+    notebook.bind("<<NotebookTabChanged>>", on_tab_changed)
     sync_dub_mode()
-    root.after(150, refresh_voice_list)
+    # root.after(150, refresh_voice_list)  # DISABLED: Lazy load instead
     root.after(100, update_preview)
     load_preview_segments(app_config.get("last_render_dir", ""))
     
     def start_processing():
-        source = source_state.get()
+        source = source_state.get().strip()
         if not source:
             log("[ERROR] Vui lòng nhập link video hoặc đường dẫn file")
+            toast.error("Vui lòng nhập link video hoặc đường dẫn file")
             return
 
-        if not is_local_file(source):
+        # Validate local file
+        if is_local_file(source):
+            source_path = Path(source)
+            if not source_path.exists():
+                log(f"[ERROR] File không tồn tại: {source}")
+                toast.error("File không tồn tại")
+                return
+            if source_path.is_dir():
+                log(f"[ERROR] Đây là thư mục, không phải file video: {source}")
+                toast.error("Vui lòng chọn file video, không phải thư mục")
+                return
+            # Check video extension
+            valid_extensions = {'.mp4', '.avi', '.mkv', '.mov', '.flv', '.wmv', '.webm', '.m4v', '.mpg', '.mpeg'}
+            if source_path.suffix.lower() not in valid_extensions:
+                log(f"[ERROR] File không phải định dạng video hợp lệ: {source_path.suffix}")
+                toast.error(f"File không phải video hợp lệ ({source_path.suffix})")
+                return
+        else:
+            # Validate online link
             ok, preflight_msg = check_source_preconditions(source)
             if preflight_msg:
                 level = "[INFO]" if ok else "[ERROR]"
                 log(f"{level} Preflight: {preflight_msg}")
             if not ok:
+                toast.error(f"Preflight failed: {preflight_msg}")
                 return
 
         if enable_dub_state.get():
             backend_mode = dub_backend_mode_state.get()
             remote_api_base = dub_remote_api_base_state.get().strip()
             if not is_vieneu_available(engine_mode=backend_mode, remote_api_base=remote_api_base):
-                log(f"[ERROR] VieNeu-TTS chưa sẵn sàng: {get_vieneu_error(engine_mode=backend_mode, remote_api_base=remote_api_base)}")
+                error_msg = get_vieneu_error(engine_mode=backend_mode, remote_api_base=remote_api_base)
+                log(f"[ERROR] VieNeu-TTS chưa sẵn sàng: {error_msg}")
+                toast.error(f"VieNeu-TTS chưa sẵn sàng")
                 notebook.select(dub_tab)
                 return
             if backend_mode == "remote" and not remote_api_base:
                 log("[ERROR] Vui lòng nhập Remote API Base khi dùng mode remote")
+                toast.error("Vui lòng nhập Remote API Base")
                 notebook.select(dub_tab)
                 return
             if dub_mode_state.get() == "preset" and not dub_preset_voice_state.get():
                 log("[ERROR] Vui lòng chọn giọng mẫu để lồng tiếng")
+                toast.error("Vui lòng chọn giọng mẫu")
                 notebook.select(dub_tab)
                 return
             if dub_mode_state.get() == "clone" and not Path(dub_ref_audio_state.get()).exists():
                 log("[ERROR] Vui lòng chọn file audio mẫu hợp lệ để clone giọng")
+                toast.error("Vui lòng chọn file audio mẫu hợp lệ")
                 notebook.select(dub_tab)
                 return
         
@@ -1962,9 +2085,14 @@ def launch_gui():
         )
         
         try:
+            # Show loading overlay
+            loading_overlay.update_message("Đang xử lý video...")
+            loading_overlay.show()
+            root.update()
+
             # Disable buttons during processing
             start_btn.config(state=tk.DISABLED)
-            
+
             # Process video
             result = process_video(
                 source_input=source,
@@ -2006,8 +2134,10 @@ def launch_gui():
         
         except Exception as e:
             log(f"[ERROR] {str(e)}")
-        
+
         finally:
+            # Hide loading overlay
+            loading_overlay.hide()
             start_btn.config(state=tk.NORMAL)
 
     # ═══════════════════════════════════════════════════════════
