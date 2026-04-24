@@ -359,11 +359,31 @@ def launch_gui():
         "render_meta": {},
     }
 
-    # ── Placeholder functions (will be defined properly later) ─────────
-    def paste_clipboard(): pass
-    def browse_file(): pass
-    def load_source_preview(force=False): pass
-    def log(*args): pass
+    # ── Helper functions (defined before views need them) ──────────────
+    def paste_clipboard():
+        try:
+            source_state.set(root.clipboard_get().strip())
+            load_source_preview(force=True)
+        except:
+            pass
+
+    def browse_file():
+        from tkinter import filedialog
+        filename = filedialog.askopenfilename(
+            title="Chọn file video",
+            filetypes=[("File video", "*.mp4 *.avi *.mkv *.mov *.flv"), ("Tất cả file", "*.*")]
+        )
+        if filename:
+            source_state.set(filename)
+            load_source_preview(force=True)
+
+    def load_source_preview(force=False):
+        # Placeholder - will be overridden by real implementation later
+        pass
+
+    def log(*args):
+        # Placeholder - will be overridden after log_area is created
+        pass
 
     # Build Source tab UI using SourceView
     source_view_state = {
@@ -793,6 +813,9 @@ def launch_gui():
     dub_preview_btn = dub_widgets['dub_preview_btn']
     dub_stop_preview_btn = dub_widgets['dub_stop_preview_btn']
 
+    # Add dub tab to notebook
+    notebook.add(dub_tab, text="  Long Tieng  ")
+
 
     # ═══════════════════════════════════════════════════════════
     # SECTION 7: Log Tab - Output & Status
@@ -801,7 +824,10 @@ def launch_gui():
     log_view = LogView(notebook, log_view_state)
     log_tab = log_view.build()
     log_area = log_view_state['log_area']
-    
+
+    # Add log tab to notebook
+    notebook.add(log_tab, text="  Nhat Ky  ")
+
     # Helper functions
     def paste_clipboard():
         try:
