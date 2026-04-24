@@ -360,6 +360,8 @@ def launch_gui():
     }
 
     # ── Helper functions (defined before views need them) ──────────────
+    # Note: paste_clipboard and browse_file are defined here early
+    # load_source_preview and log will be defined later after dependencies are ready
     def paste_clipboard():
         try:
             source_state.set(root.clipboard_get().strip())
@@ -376,14 +378,6 @@ def launch_gui():
         if filename:
             source_state.set(filename)
             load_source_preview(force=True)
-
-    def load_source_preview(force=False):
-        # Placeholder - will be overridden by real implementation later
-        pass
-
-    def log(*args):
-        # Placeholder - will be overridden after log_area is created
-        pass
 
     # Build Source tab UI using SourceView
     source_view_state = {
@@ -829,23 +823,6 @@ def launch_gui():
     notebook.add(log_tab, text="  Nhat Ky  ")
 
     # Helper functions
-    def paste_clipboard():
-        try:
-            source_state.set(root.clipboard_get().strip())
-            load_source_preview(force=True)
-        except:
-            pass
-    
-    def browse_file():
-        from tkinter import filedialog
-        filename = filedialog.askopenfilename(
-            title="Chọn file video",
-            filetypes=[("File video", "*.mp4 *.avi *.mkv *.mov *.flv"), ("Tất cả file", "*.*")]
-        )
-        if filename:
-            source_state.set(filename)
-            load_source_preview(force=True)
-
     def browse_ref_audio():
         from tkinter import filedialog
         filename = filedialog.askopenfilename(
