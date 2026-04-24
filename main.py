@@ -1803,8 +1803,8 @@ def launch_gui():
     adjust_tab = adjust_view.build()
     adjust_widgets = adjust_view.get_widgets()
 
-    # Add adjust tab to notebook
-    notebook.add(adjust_tab, text="  Can Chinh  ")
+    # Add adjust tab to notebook (insert at position 1, after Source tab)
+    notebook.insert(1, adjust_tab, text="  Dieu Chinh  ")
 
     # Extract widget references from AdjustView
     preview_canvas = adjust_widgets['preview_canvas']
