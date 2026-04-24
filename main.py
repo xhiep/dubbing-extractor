@@ -379,6 +379,13 @@ def launch_gui():
             source_state.set(filename)
             load_source_preview(force=True)
 
+    # Placeholder declarations (real implementations defined after UI setup)
+    def log(*parts):
+        pass  # Will be redefined after log_area is created
+
+    def load_source_preview(force: bool = False):
+        pass  # Will be redefined after preview UI is created
+
     # Build Source tab UI using SourceView
     source_view_state = {
         'source_state': source_state,
