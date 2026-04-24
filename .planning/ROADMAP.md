@@ -8,9 +8,9 @@ status: draft
 
 ## Tổng Quan
 
-Roadmap gồm 4 phases, thực hiện tuần tự từ low-risk đến higher-risk. Mỗi phase kết thúc với manual testing để đảm bảo không có regression.
+Roadmap gồm 5 phases, thực hiện tuần tự từ low-risk đến higher-risk. Mỗi phase kết thúc với manual testing để đảm bảo không có regression.
 
-**Total Estimate**: 9-13 giờ làm việc tập trung
+**Total Estimate**: 11-16 giờ làm việc tập trung (Phases 1-4 hoàn thành, Phase 5 còn lại)
 
 ## Phase 1: Code Cleanup (Low Risk)
 
@@ -286,6 +286,52 @@ Plans:
 
 ---
 
+## Phase 5: Extract View Components (Final Refactor)
+
+**Goal**: Tách 4 tabs UI ra thành view files riêng, giảm main.py xuống ~400 dòng
+
+**Duration**: 2-3 giờ
+
+**Risk Level**: MEDIUM - Di chuyển UI code, có thể break layout
+
+**Plans:** 5 plans
+
+Plans:
+- [ ] 05-01-PLAN.md — Create views module and extract Log tab (simplest)
+- [ ] 05-02-PLAN.md — Extract Dub tab to DubView
+- [ ] 05-03-PLAN.md — Extract Source tab to SourceView
+- [ ] 05-04-PLAN.md — Extract Adjust tab to AdjustView (most complex, includes scroll setup)
+- [ ] 05-05-PLAN.md — Integration testing and documentation update
+
+### Wave Structure
+
+| Wave | Plans | Autonomous |
+|------|-------|------------|
+| 1 | 05-01 | yes |
+| 2 | 05-02 | yes |
+| 3 | 05-03 | yes |
+| 4 | 05-04 | yes |
+| 5 | 05-05 | no (has checkpoint) |
+
+### Success Criteria
+- [ ] All 4 tabs extracted to separate view files
+- [ ] main.py < 500 dòng (từ ~2,527)
+- [ ] Views are pure UI (no business logic)
+- [ ] All tabs render correctly
+- [ ] No regressions in functionality
+
+### Testing
+- **Automated**: Syntax checks, import verification, organization checks
+- **Manual**: Full application testing (all tabs, processing, config persistence)
+
+### Deliverables
+- `src/views/` với 4 view files
+- Updated `main.py` (~400 dòng, giảm từ ~2,527)
+- Updated `CLAUDE.md` với Phase 5 info
+- Updated `CHANGELOG.md`
+- Testing report: "Phase 5 complete, all features working"
+---
+
 ## Summary
 
 ### Before Refactoring
@@ -295,23 +341,29 @@ Plans:
 - Type hints: Partial
 - Documentation: Some inaccuracies
 
-### After Refactoring
-- main.py: ~1,000-1,500 lines (50% reduction)
+### After Refactoring (Phase 4)
+- main.py: ~2,527 lines (organized with section markers)
 - Dead code: None
 - Error handling: Consistent, proper logging
 - Type hints: 100% on public APIs
 - Documentation: Accurate and complete
 - Structure: Clear separation (controllers, modules, components)
 
+### After Phase 5 (Target)
+- main.py: ~400 lines (84% reduction from original)
+- Views: 4 separate view files in src/views/
+- Structure: Complete MVC separation (views, controllers, modules)
+
 ### Metrics
 
-| Metric | Before | After | Improvement |
-|--------|--------|-------|-------------|
-| main.py lines | ~3,000 | ~1,500 | 50% reduction |
-| Dead code | Yes | None | 100% removed |
-| Type hints | Partial | 100% public | Full coverage |
-| Error handling | Inconsistent | Consistent | Standardized |
-| Documentation | Some errors | Accurate | Updated |
+| Metric | Before | After Phase 4 | After Phase 5 (Target) | Total Improvement |
+|--------|--------|---------------|------------------------|-------------------|
+| main.py lines | ~3,000 | ~2,527 | ~400 | 87% reduction |
+| Dead code | Yes | None | None | 100% removed |
+| Type hints | Partial | 100% public | 100% public | Full coverage |
+| Error handling | Inconsistent | Consistent | Consistent | Standardized |
+| Documentation | Some errors | Accurate | Accurate | Updated |
+| Structure | Monolithic | Controllers added | Full MVC | Complete separation |
 
 ### Risk Mitigation
 
