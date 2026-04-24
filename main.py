@@ -54,6 +54,7 @@ from src.components.layout import Card, Section, Row, Column
 from src.components.theme import T
 from src.components.hooks import use_tk_state
 from src.controllers import SourceController, SubtitleController, TtsController, AppController
+from src.views import LogView, DubView, SourceView, AdjustView
 from src.utils.file_utils import is_local_file
 from src.utils.runtime_env import ensure_local_runtime_env
 from src.utils.ui_helpers import expand_band_from_center, shift_band
@@ -311,100 +312,11 @@ def launch_gui():
     notebook = ttk.Notebook(main_frame)
     notebook.pack(fill=tk.BOTH, expand=True)
 
-    source_tab = tk.Frame(notebook, padx=16, pady=16, bg=T.BG_WHITE)
-    adjust_tab = tk.Frame(notebook, padx=16, pady=16, bg=T.BG_WHITE)
     dub_tab = tk.Frame(notebook, padx=16, pady=16, bg=T.BG_WHITE)
-    log_tab = tk.Frame(notebook, padx=16, pady=16, bg=T.BG_WHITE)
-
-    notebook.add(source_tab, text="  Nguon  ")
-    notebook.add(adjust_tab, text="  Can Chinh  ")
-    notebook.add(dub_tab, text="  Long Tieng  ")
-    notebook.add(log_tab, text="  Nhat Ky  ")
-
-    adjust_canvas = tk.Canvas(adjust_tab, highlightthickness=0, bg=T.BG_WHITE)
-    adjust_scrollbar = ttk.Scrollbar(adjust_tab, orient=tk.VERTICAL, command=adjust_canvas.yview)
-    adjust_canvas.configure(yscrollcommand=adjust_scrollbar.set)
-    adjust_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-    adjust_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-    adjust_body = tk.Frame(adjust_canvas, bg=T.BG_WHITE)
-    adjust_window = adjust_canvas.create_window((0, 0), window=adjust_body, anchor="nw")
-
-    def _sync_adjust_scroll(_event=None):
-        adjust_canvas.configure(scrollregion=adjust_canvas.bbox("all"))
-
-    def _resize_adjust_window(event):
-        adjust_canvas.itemconfigure(adjust_window, width=event.width)
-
-    def _wheel_adjust(event):
-        if preview_guard.get("over_preview"):
-            return "break"
-        delta = event.delta
-        if delta == 0 and getattr(event, "num", None) == 4:
-            delta = 120
-        elif delta == 0 and getattr(event, "num", None) == 5:
-            delta = -120
-        if delta:
-            adjust_canvas.yview_scroll(int(-delta / 120), "units")
-            return "break"
-        return None
-
-    adjust_body.bind("<Configure>", _sync_adjust_scroll)
-    adjust_canvas.bind("<Configure>", _resize_adjust_window)
-
-    adjust_split = tk.Frame(adjust_body, bg=T.BG_WHITE)
-    adjust_split.pack(fill=tk.BOTH, expand=True)
-    adjust_split.grid_columnconfigure(0, weight=0, minsize=420)
-    adjust_split.grid_columnconfigure(1, weight=1)
-    adjust_split.grid_rowconfigure(0, weight=1)
-
-    adjust_left = tk.Frame(adjust_split, bg=T.BG_WHITE)
-    adjust_left.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
-
-    adjust_right = tk.Frame(adjust_split, bg=T.BG_WHITE)
-    adjust_right.grid(row=0, column=1, sticky="nsew")
-    adjust_right.grid_rowconfigure(0, weight=1)
-    adjust_right.grid_columnconfigure(0, weight=1)
-
-    def _bind_scroll_recursive(widget):
-        widget.bind("<MouseWheel>", _wheel_adjust, add="+")
-        widget.bind("<Button-4>", _wheel_adjust, add="+")
-        widget.bind("<Button-5>", _wheel_adjust, add="+")
-        for child in widget.winfo_children():
-            _bind_scroll_recursive(child)
 
     # ═══════════════════════════════════════════════════════════
     # SECTION 4: Source Tab - Video Input & Processing
     # ═══════════════════════════════════════════════════════════
-    # Video source section
-    source_card = Card(source_tab, title="📹 Nguồn Video")
-    source_container = source_card.get_container()
-
-    source_input = Input(source_container, placeholder="Dán link video (YouTube, Bilibili, Douyin) hoặc chọn file local...", width=70)
-    source_input.var = source_state.var
-    source_input.pack(fill=tk.X, pady=5)
-    source_input.widget.bind("<Return>", lambda _e: load_source_preview(force=True))
-    source_input.widget.bind("<FocusOut>", lambda _e: load_source_preview(force=True))
-
-    btn_row = Row(source_container, spacing=8, bg=T.BG_LIGHT)
-    Button(btn_row.frame, text="Dan Link", command=lambda: paste_clipboard(),
-           bg=T.ACCENT, fg=T.BG_WHITE, width=14, height=1,
-           font=T.FONT_BODY).widget.pack(side=tk.LEFT, padx=(0, 8))
-    Button(btn_row.frame, text="Chon File", command=lambda: browse_file(),
-           bg=T.SURFACE_DARK_2, fg=T.BG_WHITE, width=14, height=1,
-           font=T.FONT_BODY).widget.pack(side=tk.LEFT)
-    btn_row.pack(anchor=tk.W, pady=(4, 0))
-
-    source_hint = Label(
-        source_container,
-        text="Ho tro: YouTube, Bilibili, Douyin | File video local (MP4, AVI, MKV, MOV)",
-        font=T.FONT_SMALL,
-        fg=T.TEXT_SECONDARY,
-        bg=T.BG_LIGHT,
-    )
-    source_hint.pack(anchor=tk.W, pady=(8, 0))
-
-    source_card.pack(fill=tk.X, pady=5)
-
     # ── Pipeline state ──────────────────────────────────────────────────
     pipeline_state = {
         "out_dir": None,
@@ -420,161 +332,74 @@ def launch_gui():
         "current_step": 0,  # bước đã hoàn thành gần nhất
     }
 
-    # Màu nút theo trạng thái
-    STEP_COLOR_IDLE    = "#95a5a6"
-    STEP_COLOR_RUNNING = "#3498db"
-    STEP_COLOR_DONE    = "#27ae60"
-    STEP_COLOR_ERROR   = "#e74c3c"
+    # ── Preview and preset guards ───────────────────────────────────────
+    preset_guard = {"applying": False}
+    preview_guard = {
+        "source": None,
+        "image": None,
+        "live_render": False,
+        "render_after_id": None,
+        "render_signature": None,
+        "kind": None,
+        "duration": 0.0,
+        "path": None,
+        "playing": False,
+        "after_id": None,
+        "updating_seek": False,
+        "drag_margin_start": 0,
+        "drag_offset_start": 0.0,
+        "drag_x_start": 0,
+        "drag_y_start": 0,
+        "drag_active": False,
+        "segments": [],
+        "selected_segment": None,
+        "over_preview": False,
+        "video_rect": (0, 0, 0, 0),
+        "subtitle_rect": (0, 0, 0, 0),
+        "render_meta": {},
+    }
 
-    # ── Card "Chạy Từng Bước" trong tab Nguồn ───────────────────────────
-    steps_card = Card(source_tab, title="🔢 Chạy Từng Bước")
-    steps_container = steps_card.get_container()
+    # ── Placeholder functions (will be defined properly later) ─────────
+    def paste_clipboard(): pass
+    def browse_file(): pass
+    def load_source_preview(force=False): pass
+    def log(*args): pass
 
-    # Hàng nút các bước
-    step_btns_row = tk.Frame(steps_container, bg="white")
-    step_btns_row.pack(fill=tk.X, pady=(0, 8))
+    # Build Source tab UI using SourceView
+    source_view_state = {
+        'source_state': source_state,
+        'whisper_model_state': whisper_model_state,
+        'pipeline_state': pipeline_state,
+        'preview_guard': preview_guard,
+    }
+    source_view_callbacks = {
+        'paste_clipboard': paste_clipboard,
+        'browse_file': browse_file,
+        'load_source_preview': load_source_preview,
+        'log': log,
+    }
+    source_view = SourceView(notebook, source_view_state, source_view_callbacks)
+    source_tab = source_view.build()
+    source_widgets = source_view.get_widgets()
 
-    STEP_LABELS = [
-        "1: Tải Video",
-        "2: Nhận Dạng",
-        "3: Dịch",
-        "4: Render Video",
-        "5: Burn Sub + Lồng",
-    ]
-    step_btn_widgets = []
-    for i, label in enumerate(STEP_LABELS):
-        btn = tk.Button(
-            step_btns_row,
-            text=f"Bước {label}",
-            bg=STEP_COLOR_IDLE,
-            fg="white",
-            font=("Segoe UI", 9, "bold"),
-            relief=tk.FLAT,
-            padx=10,
-            pady=6,
-            cursor="hand2",
-        )
-        btn.pack(side=tk.LEFT, padx=(0, 6))
-        step_btn_widgets.append(btn)
+    # Add source tab to notebook
+    notebook.add(source_tab, text="  Nguon  ")
 
-    # Hàng trạng thái + nút Reset
-    status_row = tk.Frame(steps_container, bg="white")
-    status_row.pack(fill=tk.X, pady=(0, 12))
-
-    pipeline_status_var = tk.StringVar(value="● Chưa bắt đầu")
-    pipeline_status_label = tk.Label(
-        status_row,
-        textvariable=pipeline_status_var,
-        font=("Segoe UI", 9),
-        fg="#7f8c8d",
-        bg="white",
-        anchor="w",
-    )
-    pipeline_status_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
-
-    reset_pipeline_btn = tk.Button(
-        status_row,
-        text="↺ Reset",
-        bg="#ecf0f1",
-        fg="#2c3e50",
-        font=("Segoe UI", 9),
-        relief=tk.FLAT,
-        padx=8,
-        pady=4,
-        cursor="hand2",
-    )
-    reset_pipeline_btn.pack(side=tk.RIGHT)
-
-    # Separator
-    tk.Frame(steps_container, height=1, bg="#e0e0e0").pack(fill=tk.X, pady=(0, 10))
-
-    # ── Ô edit SRT ──────────────────────────────────────────────────────
-    srt_edit_label = tk.Label(
-        steps_container,
-        text="✏️ Sửa Bản Dịch (SRT) — Chỉnh sửa sau Bước 3, trước khi chạy Bước 4",
-        font=("Segoe UI", 9, "bold"),
-        fg="#2c3e50",
-        bg="white",
-        anchor="w",
-    )
-    srt_edit_label.pack(fill=tk.X, pady=(0, 4))
-
-    srt_edit_ctrl_row = tk.Frame(steps_container, bg="white")
-    srt_edit_ctrl_row.pack(fill=tk.X, pady=(0, 6))
-
-    open_srt_btn = tk.Button(
-        srt_edit_ctrl_row,
-        text="📂 Mở File Ngoài",
-        bg="#2196F3",
-        fg="white",
-        font=("Segoe UI", 9),
-        relief=tk.FLAT,
-        padx=8,
-        pady=4,
-        state=tk.DISABLED,
-        cursor="hand2",
-    )
-    open_srt_btn.pack(side=tk.LEFT, padx=(0, 6))
-
-    reload_srt_btn = tk.Button(
-        srt_edit_ctrl_row,
-        text="🔄 Tải Lại",
-        bg="#FF9800",
-        fg="white",
-        font=("Segoe UI", 9),
-        relief=tk.FLAT,
-        padx=8,
-        pady=4,
-        state=tk.DISABLED,
-        cursor="hand2",
-    )
-    reload_srt_btn.pack(side=tk.LEFT, padx=(0, 6))
-
-    save_srt_btn = tk.Button(
-        srt_edit_ctrl_row,
-        text="💾 Lưu Thay Đổi",
-        bg="#27ae60",
-        fg="white",
-        font=("Segoe UI", 9),
-        relief=tk.FLAT,
-        padx=8,
-        pady=4,
-        state=tk.DISABLED,
-        cursor="hand2",
-    )
-    save_srt_btn.pack(side=tk.LEFT)
-
-    srt_file_label_var = tk.StringVar(value="(Chưa có file SRT)")
-    tk.Label(
-        srt_edit_ctrl_row,
-        textvariable=srt_file_label_var,
-        font=("Segoe UI", 8),
-        fg="#95a5a6",
-        bg="white",
-    ).pack(side=tk.LEFT, padx=(12, 0))
-
-    srt_edit_frame = tk.Frame(steps_container, bg="white")
-    srt_edit_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 4))
-
-    srt_editor = tk.Text(
-        srt_edit_frame,
-        height=14,
-        font=("Consolas", 9),
-        bg="#f8f9fa",
-        fg="#2c3e50",
-        relief=tk.SUNKEN,
-        borderwidth=1,
-        state=tk.DISABLED,
-        wrap=tk.NONE,
-    )
-    srt_scrollbar_y = ttk.Scrollbar(srt_edit_frame, orient=tk.VERTICAL, command=srt_editor.yview)
-    srt_scrollbar_x = ttk.Scrollbar(steps_container, orient=tk.HORIZONTAL, command=srt_editor.xview)
-    srt_editor.configure(yscrollcommand=srt_scrollbar_y.set, xscrollcommand=srt_scrollbar_x.set)
-    srt_scrollbar_y.pack(side=tk.RIGHT, fill=tk.Y)
-    srt_editor.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-    srt_scrollbar_x.pack(fill=tk.X)
-
-    steps_card.pack(fill=tk.BOTH, expand=True, pady=5)
+    # Extract widget references for use in helper functions
+    step_btn_widgets = source_widgets['step_btn_widgets']
+    pipeline_status_var = source_widgets['pipeline_status_var']
+    pipeline_status_label = source_widgets['pipeline_status_label']
+    reset_pipeline_btn = source_widgets['reset_pipeline_btn']
+    open_srt_btn = source_widgets['open_srt_btn']
+    reload_srt_btn = source_widgets['reload_srt_btn']
+    save_srt_btn = source_widgets['save_srt_btn']
+    srt_file_label_var = source_widgets['srt_file_label_var']
+    srt_editor = source_widgets['srt_editor']
+    source_input = source_widgets['source_input']
+    STEP_COLOR_IDLE = source_widgets['STEP_COLOR_IDLE']
+    STEP_COLOR_RUNNING = source_widgets['STEP_COLOR_RUNNING']
+    STEP_COLOR_DONE = source_widgets['STEP_COLOR_DONE']
+    STEP_COLOR_ERROR = source_widgets['STEP_COLOR_ERROR']
 
     # ── Hàm hỗ trợ pipeline ─────────────────────────────────────────────
 
@@ -927,383 +752,55 @@ def launch_gui():
     # ═══════════════════════════════════════════════════════════
     # SECTION 5: Adjust Tab - Subtitle Parameters
     # ═══════════════════════════════════════════════════════════
-    # Settings section
-    settings_card = Card(adjust_left, title="Cai Dat Phu De Va Vung Che")
-    settings_container = settings_card.get_container()
-
-    def _lbl(parent, text, width=18):
-        return tk.Label(parent, text=text, width=width, anchor="w",
-                        font=T.FONT_BODY, fg=T.TEXT_PRIMARY, bg=T.BG_LIGHT)
-
-    def _hint(parent, text):
-        return tk.Label(parent, text=text, font=T.FONT_SMALL,
-                        fg=T.TEXT_SECONDARY, bg=T.BG_LIGHT)
-
-    # Cover mode
-    cover_label = Label(settings_container, text="Che Subtitle Goc:")
-    cover_label.pack(anchor=tk.W)
-    cover_frame = tk.Frame(settings_container, bg=T.BG_LIGHT)
-    cover_frame.pack(fill=tk.X, pady=5)
-    for mode in ["none", "blur", "blackbar"]:
-        tk.Radiobutton(
-            cover_frame,
-            text={"none": "Khong che", "blur": "Lam mo", "blackbar": "Thanh den"}[mode],
-            variable=cover_mode_state.var,
-            value=mode,
-            font=T.FONT_BODY, bg=T.BG_LIGHT, fg=T.TEXT_PRIMARY,
-            activebackground=T.BG_LIGHT, selectcolor=T.BG_WHITE,
-            relief=tk.FLAT, cursor="hand2",
-        ).pack(side=tk.LEFT, padx=5)
-
-    # Whisper model
-    model_label = Label(settings_container, text="Mo Hinh Whisper:")
-    model_label.pack(anchor=tk.W, pady=(10, 0))
-    model_frame = tk.Frame(settings_container, bg=T.BG_LIGHT)
-    model_frame.pack(fill=tk.X, pady=5)
-    for model in ["tiny", "base", "small", "medium", "large"]:
-        tk.Radiobutton(model_frame, text=model, variable=whisper_model_state.var, value=model,
-                       font=T.FONT_BODY, bg=T.BG_LIGHT, fg=T.TEXT_PRIMARY,
-                       activebackground=T.BG_LIGHT, selectcolor=T.BG_WHITE,
-                       relief=tk.FLAT, cursor="hand2").pack(side=tk.LEFT, padx=5)
-
-    # Burn subtitle
-    burn_check = Checkbox(settings_container, text="Ghi phu de vao video", default=burn_sub_state.get())
-    burn_check.var = burn_sub_state.var
-    burn_check.pack(anchor=tk.W, pady=5)
-
-    preset_row = tk.Frame(settings_container, bg=T.BG_LIGHT)
-    preset_row.pack(fill=tk.X, pady=(12, 6))
-    _lbl(preset_row, "Mau Phu De:").pack(side=tk.LEFT)
-    preset_combo = ttk.Combobox(
-        preset_row, textvariable=preset_state.var,
-        values=list(SUBTITLE_PRESETS.keys()), state="readonly", width=16,
-    )
-    preset_combo.pack(side=tk.LEFT)
-    _hint(preset_row, "Chon preset hoac de Tuy Chinh de chinh tay").pack(side=tk.LEFT, padx=8)
-
-    timing_row = tk.Frame(settings_container, bg=T.BG_LIGHT)
-    timing_row.pack(fill=tk.X, pady=(12, 6))
-    _lbl(timing_row, "Lech Thoi Gian (s):").pack(side=tk.LEFT)
-    tk.Spinbox(timing_row, from_=-30.0, to=30.0, increment=0.1, textvariable=subtitle_offset_state.var, width=8,
-               font=T.FONT_BODY, bg=T.BG_WHITE, fg=T.TEXT_PRIMARY, relief=tk.FLAT, borderwidth=1).pack(side=tk.LEFT)
-    _hint(timing_row, "Am = hien som hon, duong = hien tre hon").pack(side=tk.LEFT, padx=8)
-
-    speed_row = tk.Frame(settings_container, bg=T.BG_LIGHT)
-    speed_row.pack(fill=tk.X, pady=6)
-    _lbl(speed_row, "Ti Le Timing Sub:").pack(side=tk.LEFT)
-    tk.Spinbox(speed_row, from_=0.5, to=2.0, increment=0.05, textvariable=subtitle_scale_state.var, width=8,
-               font=T.FONT_BODY, bg=T.BG_WHITE, fg=T.TEXT_PRIMARY, relief=tk.FLAT, borderwidth=1).pack(side=tk.LEFT)
-    _hint(speed_row, "1.0 = thoi gian goc").pack(side=tk.LEFT, padx=8)
-
-    video_speed_row = tk.Frame(settings_container, bg=T.BG_LIGHT)
-    video_speed_row.pack(fill=tk.X, pady=6)
-    _lbl(video_speed_row, "Toc Do Video:").pack(side=tk.LEFT)
-    tk.Spinbox(video_speed_row, from_=0.25, to=4.0, increment=0.05, textvariable=video_speed_state.var, width=8,
-               font=T.FONT_BODY, bg=T.BG_WHITE, fg=T.TEXT_PRIMARY, relief=tk.FLAT, borderwidth=1).pack(side=tk.LEFT)
-    _hint(video_speed_row, "1.0 = goc | >1 nhanh hon | <1 cham hon").pack(side=tk.LEFT, padx=8)
-
-    font_row = tk.Frame(settings_container, bg=T.BG_LIGHT)
-    font_row.pack(fill=tk.X, pady=6)
-    _lbl(font_row, "Ti Le Co Chu:").pack(side=tk.LEFT)
-    tk.Spinbox(font_row, from_=0.5, to=2.5, increment=0.1, textvariable=font_scale_state.var, width=8,
-               font=T.FONT_BODY, bg=T.BG_WHITE, fg=T.TEXT_PRIMARY, relief=tk.FLAT, borderwidth=1).pack(side=tk.LEFT)
-    _hint(font_row, "Dung khi ghi phu de vao video").pack(side=tk.LEFT, padx=8)
-
-    font_size_row = tk.Frame(settings_container, bg=T.BG_LIGHT)
-    font_size_row.pack(fill=tk.X, pady=6)
-    _lbl(font_size_row, "Co Chu:").pack(side=tk.LEFT)
-    tk.Spinbox(font_size_row, from_=0, to=96, increment=1, textvariable=font_size_state.var, width=8,
-               font=T.FONT_BODY, bg=T.BG_WHITE, fg=T.TEXT_PRIMARY, relief=tk.FLAT, borderwidth=1).pack(side=tk.LEFT)
-    _hint(font_size_row, "0 = tu dong theo ti le co chu").pack(side=tk.LEFT, padx=8)
-
-    margin_row = tk.Frame(settings_container, bg=T.BG_LIGHT)
-    margin_row.pack(fill=tk.X, pady=6)
-    _lbl(margin_row, "Lech Vi Tri Doc:").pack(side=tk.LEFT)
-    tk.Spinbox(margin_row, from_=-240, to=240, increment=4, textvariable=margin_state.var, width=8,
-               font=T.FONT_BODY, bg=T.BG_WHITE, fg=T.TEXT_PRIMARY, relief=tk.FLAT, borderwidth=1).pack(side=tk.LEFT)
-    _hint(margin_row, "So pixel lech so voi vi tri mac dinh").pack(side=tk.LEFT, padx=8)
-
-    chars_row = tk.Frame(settings_container, bg=T.BG_LIGHT)
-    chars_row.pack(fill=tk.X, pady=6)
-    _lbl(chars_row, "Ky Tu Moi Dong:").pack(side=tk.LEFT)
-    tk.Spinbox(chars_row, from_=20, to=80, increment=1, textvariable=chars_per_line_state.var, width=8,
-               font=T.FONT_BODY, bg=T.BG_WHITE, fg=T.TEXT_PRIMARY, relief=tk.FLAT, borderwidth=1).pack(side=tk.LEFT)
-    _hint(chars_row, "Dung khi xuat file SRT").pack(side=tk.LEFT, padx=8)
-
-    blur_pad_row = tk.Frame(settings_container, bg=T.BG_LIGHT)
-    blur_pad_row.pack(fill=tk.X, pady=6)
-    _lbl(blur_pad_row, "Noi Vung Che (px):").pack(side=tk.LEFT)
-    tk.Spinbox(blur_pad_row, from_=0, to=200, increment=2, textvariable=blur_padding_state.var, width=8,
-               font=T.FONT_BODY, bg=T.BG_WHITE, fg=T.TEXT_PRIMARY, relief=tk.FLAT, borderwidth=1).pack(side=tk.LEFT)
-    _hint(blur_pad_row, "Noi doi xung tu tam vung subtitle cu").pack(side=tk.LEFT, padx=8)
-
-    blur_power_row = tk.Frame(settings_container, bg=T.BG_LIGHT)
-    blur_power_row.pack(fill=tk.X, pady=6)
-    _lbl(blur_power_row, "Do Mo:").pack(side=tk.LEFT)
-    tk.Spinbox(blur_power_row, from_=1, to=10, increment=1, textvariable=blur_power_state.var, width=8,
-               font=T.FONT_BODY, bg=T.BG_WHITE, fg=T.TEXT_PRIMARY, relief=tk.FLAT, borderwidth=1).pack(side=tk.LEFT)
-    _hint(blur_power_row, "Chi ap dung khi chon che do Lam mo").pack(side=tk.LEFT, padx=8)
-
-    cover_offset_row = tk.Frame(settings_container, bg=T.BG_LIGHT)
-    cover_offset_row.pack(fill=tk.X, pady=6)
-    _lbl(cover_offset_row, "Day Vung Che Len:").pack(side=tk.LEFT)
-    tk.Spinbox(cover_offset_row, from_=-240, to=240, increment=2, textvariable=cover_offset_state.var, width=8,
-               font=T.FONT_BODY, bg=T.BG_WHITE, fg=T.TEXT_PRIMARY, relief=tk.FLAT, borderwidth=1).pack(side=tk.LEFT)
-    _hint(cover_offset_row, "Duong = keo vung che len, am = day xuong").pack(side=tk.LEFT, padx=8)
-
-    settings_card.pack(fill=tk.X, pady=5)
+    # Build Adjust tab UI using AdjustView (will be instantiated after helper functions are defined)
 
     # ═══════════════════════════════════════════════════════════
     # SECTION 6: Dub Tab - TTS Configuration
     # ═══════════════════════════════════════════════════════════
-    # Dubbing tab
-    dub_card = Card(dub_tab, title="Long Tieng Tieng Viet")
-    dub_container = dub_card.get_container()
+    dub_view_state = {
+        'enable_dub_state': enable_dub_state,
+        'dub_mode_state': dub_mode_state,
+        'dub_backend_mode_state': dub_backend_mode_state,
+        'dub_remote_api_base_state': dub_remote_api_base_state,
+        'dub_preset_voice_state': dub_preset_voice_state,
+        'dub_ref_audio_state': dub_ref_audio_state,
+        'dub_ref_text_state': dub_ref_text_state,
+        'dub_voice_volume_state': dub_voice_volume_state,
+        'dub_source_volume_state': dub_source_volume_state,
+        'dub_mix_mode_state': dub_mix_mode_state,
+        'tts_preview_text_state': tts_preview_text_state,
+    }
+    dub_view_callbacks = {
+        'browse_ref_audio': None,  # Will be set by TtsController
+        'log': None,  # Will be set after log_area is created
+    }
+    dub_view = DubView(dub_tab, dub_view_state, dub_view_callbacks)
+    dub_tab_frame = dub_view.build()
+    dub_widgets = dub_view.get_widgets()
 
-    tts_status_var = tk.StringVar(value="VieNeu-TTS chua duoc kiem tra.")
-    tts_status_label = tk.Label(dub_container, textvariable=tts_status_var,
-                                anchor="w", justify=tk.LEFT,
-                                fg=T.TEXT_SECONDARY, bg=T.BG_LIGHT,
-                                font=T.FONT_SMALL)
-    tts_status_label.pack(fill=tk.X, pady=(0, 8))
+    # Extract individual widget references for backward compatibility
+    tts_status_var = dub_widgets['tts_status_var']
+    tts_status_label = dub_widgets['tts_status_label']
+    enable_dub_check = dub_widgets['enable_dub_check']
+    dub_backend_combo = dub_widgets['dub_backend_combo']
+    dub_remote_entry = dub_widgets['dub_remote_entry']
+    preset_voice_combo = dub_widgets['preset_voice_combo']
+    dub_refresh_voice_btn = dub_widgets['dub_refresh_voice_btn']
+    ref_audio_entry = dub_widgets['ref_audio_entry']
+    dub_browse_ref_btn = dub_widgets['dub_browse_ref_btn']
+    ref_text_box = dub_widgets['ref_text_box']
+    tts_preview_box = dub_widgets['tts_preview_box']
+    dub_preview_btn = dub_widgets['dub_preview_btn']
+    dub_stop_preview_btn = dub_widgets['dub_stop_preview_btn']
 
-    enable_dub_check = Checkbox(dub_container, text="Bat long tieng tieng Viet", default=enable_dub_state.get())
-    enable_dub_check.var = enable_dub_state.var
-    enable_dub_check.pack(anchor=tk.W, pady=(0, 8))
-
-    dub_mode_row = tk.Frame(dub_container, bg=T.BG_LIGHT)
-    dub_mode_row.pack(fill=tk.X, pady=4)
-    _lbl(dub_mode_row, "Che Do Giong:").pack(side=tk.LEFT)
-    tk.Radiobutton(dub_mode_row, text="Giong mau", variable=dub_mode_state.var, value="preset",
-                   font=T.FONT_BODY, bg=T.BG_LIGHT, fg=T.TEXT_PRIMARY,
-                   activebackground=T.BG_LIGHT, selectcolor=T.BG_WHITE,
-                   relief=tk.FLAT, cursor="hand2").pack(side=tk.LEFT, padx=4)
-    tk.Radiobutton(dub_mode_row, text="Clone tu file", variable=dub_mode_state.var, value="clone",
-                   font=T.FONT_BODY, bg=T.BG_LIGHT, fg=T.TEXT_PRIMARY,
-                   activebackground=T.BG_LIGHT, selectcolor=T.BG_WHITE,
-                   relief=tk.FLAT, cursor="hand2").pack(side=tk.LEFT, padx=4)
-
-    dub_backend_row = tk.Frame(dub_container, bg=T.BG_LIGHT)
-    dub_backend_row.pack(fill=tk.X, pady=4)
-    _lbl(dub_backend_row, "Backend VieNeu:").pack(side=tk.LEFT)
-    dub_backend_combo = ttk.Combobox(
-        dub_backend_row, textvariable=dub_backend_mode_state.var,
-        values=["turbo", "turbo_gpu", "standard", "fast", "remote", "xpu"],
-        width=18, state="readonly",
-    )
-    dub_backend_combo.pack(side=tk.LEFT)
-    _hint(dub_backend_row, "turbo=CPU nhanh | turbo_gpu/fast=GPU | remote=server").pack(side=tk.LEFT, padx=8)
-
-    dub_remote_row = tk.Frame(dub_container, bg=T.BG_LIGHT)
-    dub_remote_row.pack(fill=tk.X, pady=4)
-    _lbl(dub_remote_row, "Remote API:").pack(side=tk.LEFT)
-    dub_remote_entry = tk.Entry(dub_remote_row, textvariable=dub_remote_api_base_state.var, width=48,
-                                font=T.FONT_BODY, bg=T.BG_WHITE, fg=T.TEXT_PRIMARY,
-                                relief=tk.FLAT, borderwidth=1,
-                                insertbackground=T.ACCENT)
-    dub_remote_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
-
-    preset_voice_row = tk.Frame(dub_container, bg=T.BG_LIGHT)
-    preset_voice_row.pack(fill=tk.X, pady=4)
-    _lbl(preset_voice_row, "Giong Mau:").pack(side=tk.LEFT)
-    preset_voice_combo = ttk.Combobox(
-        preset_voice_row, textvariable=dub_preset_voice_state.var,
-        values=[], width=28, state="readonly",
-    )
-    preset_voice_combo.pack(side=tk.LEFT)
-    dub_refresh_voice_btn = tk.Button(preset_voice_row, text="Tai Danh Sach Giong",
-                                      bg=T.BG_LIGHT, fg=T.ACCENT,
-                                      font=T.FONT_BODY, relief=tk.FLAT,
-                                      cursor="hand2", width=18)
-    dub_refresh_voice_btn.pack(side=tk.LEFT, padx=(8, 0))
-
-    ref_audio_row = tk.Frame(dub_container, bg=T.BG_LIGHT)
-    ref_audio_row.pack(fill=tk.X, pady=4)
-    _lbl(ref_audio_row, "File Giong Mau:").pack(side=tk.LEFT)
-    ref_audio_entry = tk.Entry(ref_audio_row, textvariable=dub_ref_audio_state.var, width=56,
-                               font=T.FONT_BODY, bg=T.BG_WHITE, fg=T.TEXT_PRIMARY,
-                               relief=tk.FLAT, borderwidth=1,
-                               insertbackground=T.ACCENT)
-    ref_audio_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
-    dub_browse_ref_btn = tk.Button(ref_audio_row, text="Chon File",
-                                   bg=T.SURFACE_DARK_2, fg=T.BG_WHITE,
-                                   font=T.FONT_BODY, relief=tk.FLAT,
-                                   cursor="hand2", width=12)
-    dub_browse_ref_btn.pack(side=tk.LEFT, padx=(8, 0))
-
-    ref_text_label = tk.Label(dub_container, text="Noi Dung File Mau:", anchor="w",
-                              font=T.FONT_BODY, fg=T.TEXT_PRIMARY, bg=T.BG_LIGHT)
-    ref_text_label.pack(fill=tk.X, pady=(8, 0))
-    ref_text_box = tk.Text(dub_container, height=3, font=T.FONT_BODY,
-                           bg=T.BG_WHITE, fg=T.TEXT_PRIMARY,
-                           relief=tk.FLAT, borderwidth=1,
-                           insertbackground=T.ACCENT, padx=6, pady=4)
-    ref_text_box.pack(fill=tk.X, pady=(0, 8))
-    ref_text_box.insert("1.0", dub_ref_text_state.get())
-
-    dub_mix_row = tk.Frame(dub_container, bg=T.BG_LIGHT)
-    dub_mix_row.pack(fill=tk.X, pady=4)
-    _lbl(dub_mix_row, "Am Luong Giong:").pack(side=tk.LEFT)
-    tk.Spinbox(dub_mix_row, from_=0.5, to=3.0, increment=0.05, textvariable=dub_voice_volume_state.var, width=8,
-               font=T.FONT_BODY, bg=T.BG_WHITE, fg=T.TEXT_PRIMARY, relief=tk.FLAT, borderwidth=1).pack(side=tk.LEFT)
-    _hint(dub_mix_row, "1.0 = giu nguyen | tang neu giong doc con nho").pack(side=tk.LEFT, padx=8)
-
-    dub_source_mix_row = tk.Frame(dub_container, bg=T.BG_LIGHT)
-    dub_source_mix_row.pack(fill=tk.X, pady=4)
-    _lbl(dub_source_mix_row, "Am Luong Goc:").pack(side=tk.LEFT)
-    tk.Spinbox(dub_source_mix_row, from_=0.0, to=1.0, increment=0.05, textvariable=dub_source_volume_state.var, width=8,
-               font=T.FONT_BODY, bg=T.BG_WHITE, fg=T.TEXT_PRIMARY, relief=tk.FLAT, borderwidth=1).pack(side=tk.LEFT)
-    _hint(dub_source_mix_row, "0 = tat tieng goc, 0.18 = nen nho phia sau").pack(side=tk.LEFT, padx=8)
-
-    dub_mix_mode_row = tk.Frame(dub_container, bg=T.BG_LIGHT)
-    dub_mix_mode_row.pack(fill=tk.X, pady=4)
-    _lbl(dub_mix_mode_row, "Cach Mix Audio:").pack(side=tk.LEFT)
-    dub_mix_mode_combo = ttk.Combobox(
-        dub_mix_mode_row, textvariable=dub_mix_mode_state.var,
-        values=["nen_nho", "tat_goc"], width=18, state="readonly",
-    )
-    dub_mix_mode_combo.pack(side=tk.LEFT)
-    _hint(dub_mix_mode_row, "nen_nho = giu nhac nen nho | tat_goc = tat audio goc").pack(side=tk.LEFT, padx=8)
-
-    preview_tts_label = tk.Label(dub_container, text="Text Nghe Thu:", anchor="w",
-                                 font=T.FONT_BODY, fg=T.TEXT_PRIMARY, bg=T.BG_LIGHT)
-    preview_tts_label.pack(fill=tk.X, pady=(10, 0))
-    tts_preview_box = tk.Text(dub_container, height=4, font=T.FONT_BODY,
-                              bg=T.BG_WHITE, fg=T.TEXT_PRIMARY,
-                              relief=tk.FLAT, borderwidth=1,
-                              insertbackground=T.ACCENT, padx=6, pady=4)
-    tts_preview_box.pack(fill=tk.X, pady=(0, 8))
-    tts_preview_box.insert("1.0", tts_preview_text_state.get())
-
-    dub_preview_controls = tk.Frame(dub_container, bg=T.BG_LIGHT)
-    dub_preview_controls.pack(fill=tk.X, pady=(0, 8))
-    dub_preview_btn = tk.Button(dub_preview_controls, text="Nghe Thu Giong",
-                                bg=T.ACCENT, fg=T.BG_WHITE,
-                                font=T.FONT_BODY, relief=tk.FLAT,
-                                cursor="hand2", width=16)
-    dub_preview_btn.pack(side=tk.LEFT)
-    dub_stop_preview_btn = tk.Button(dub_preview_controls, text="Dung Nghe Thu",
-                                     bg=T.SURFACE_DARK_2, fg=T.BG_WHITE,
-                                     font=T.FONT_BODY, relief=tk.FLAT,
-                                     cursor="hand2", width=14)
-    dub_stop_preview_btn.pack(side=tk.LEFT, padx=(8, 0))
-
-    dub_help = tk.Label(
-        dub_container,
-        text=(
-            "Giong mau: dung nhanh, khong can file mau.\n"
-            "Clone giong: nen dung file 3-5 giay, 1 nguoi noi ro, it nhac nen, it vang.\n"
-            "Mode VieNeu: turbo=CPU GGUF, turbo_gpu=GPU, standard=CPU/GPU, "
-            "fast=LMDeploy, remote=server API, xpu=Intel GPU."
-        ),
-        anchor="w",
-        justify=tk.LEFT,
-        fg=T.TEXT_SECONDARY,
-    )
-    dub_help.pack(fill=tk.X)
-
-    dub_card.pack(fill=tk.BOTH, expand=True, pady=5)
-
-    # Adjust/preview tab
-    preview_card = Card(adjust_right, title="Xem Truoc Va Can Chinh")
-    preview_container = preview_card.get_container()
-
-    preview_info_var = tk.StringVar(value="")
-    preview_info = tk.Label(preview_container, textvariable=preview_info_var,
-                            anchor="w", justify=tk.LEFT,
-                            fg=T.TEXT_PRIMARY, bg=T.BG_LIGHT,
-                            font=T.FONT_SMALL)
-    preview_info.pack(fill=tk.X, pady=(0, 8))
-
-    preview_status_var = tk.StringVar(value="Chua tai xem truoc.")
-    tk.Label(preview_container, textvariable=preview_status_var,
-             anchor="w", justify=tk.LEFT,
-             fg=T.TEXT_SECONDARY, bg=T.BG_LIGHT,
-             font=T.FONT_SMALL).pack(fill=tk.X, pady=(0, 8))
-
-    preview_controls = tk.Frame(preview_container, bg=T.BG_LIGHT)
-    preview_controls.pack(fill=tk.X, pady=(0, 10))
-
-    def _ctrl_btn(parent, text, width, accent=False):
-        bg = T.ACCENT if accent else T.SURFACE_DARK_2
-        b = tk.Button(parent, text=text, width=width,
-                      bg=bg, fg=T.BG_WHITE,
-                      font=T.FONT_BODY, relief=tk.FLAT, cursor="hand2")
-        return b
-
-    preview_play_btn = _ctrl_btn(preview_controls, "Phat", 10, accent=True)
-    preview_play_btn.pack(side=tk.LEFT)
-
-    preview_refresh_btn = _ctrl_btn(preview_controls, "Tai Lai Khung", 12)
-    preview_refresh_btn.pack(side=tk.LEFT, padx=(8, 0))
-
-    preview_reset_pos_btn = _ctrl_btn(preview_controls, "Dat Lai Vi Tri", 14)
-    preview_reset_pos_btn.pack(side=tk.LEFT, padx=(8, 0))
-
-    preview_reset_style_btn = _ctrl_btn(preview_controls, "Dat Lai Kieu", 12)
-    preview_reset_style_btn.pack(side=tk.LEFT, padx=(8, 0))
-
-    preview_time_label_var = tk.StringVar(value="00:00 / 00:00")
-    tk.Label(preview_controls, textvariable=preview_time_label_var,
-             fg=T.TEXT_SECONDARY, bg=T.BG_LIGHT,
-             font=T.FONT_SMALL).pack(side=tk.RIGHT)
-
-    preview_seek = tk.Scale(
-        preview_container,
-        from_=0, to=100, orient=tk.HORIZONTAL,
-        showvalue=False, resolution=0.1, length=860,
-        bg=T.BG_LIGHT, fg=T.TEXT_PRIMARY,
-        troughcolor=T.BORDER, highlightthickness=0,
-        activebackground=T.ACCENT,
-    )
-    preview_seek.pack(fill=tk.X, pady=(0, 10))
-
-    preview_marker_canvas = tk.Canvas(preview_container, height=54,
-                                      bg=T.BG_CARD_DARK,
-                                      highlightthickness=1,
-                                      highlightbackground=T.SURFACE_DARK_1)
-    preview_marker_canvas.pack(fill=tk.X, pady=(0, 10))
-
-    preview_text_box = tk.Text(preview_container, height=2, font=T.FONT_BODY,
-                               bg=T.BG_WHITE, fg=T.TEXT_PRIMARY,
-                               relief=tk.FLAT, borderwidth=0,
-                               insertbackground=T.ACCENT,
-                               padx=6, pady=4)
-    preview_text_box.pack(fill=tk.X, pady=(0, 10))
-    preview_text_box.insert("1.0", preview_text_state.get())
-
-    preview_canvas = tk.Canvas(preview_container, width=900, height=360,
-                               bg=T.BG_CARD_DARK, highlightthickness=0)
-    preview_canvas.pack(fill=tk.BOTH, expand=True)
-
-    preview_card.pack(fill=tk.BOTH, expand=True, pady=5)
-
-    output_card = Card(adjust_left, title="Output Gan Nhat")
-    output_container = output_card.get_container()
-    last_output_var = tk.StringVar(value=app_config.get("last_render_dir", ""))
-    tk.Label(output_container, textvariable=last_output_var, anchor="w",
-             justify=tk.LEFT, fg=T.TEXT_SECONDARY, bg=T.BG_LIGHT,
-             font=T.FONT_SMALL).pack(fill=tk.X)
-    open_output_btn = tk.Button(output_container, text="Mo Thu Muc Render",
-                                bg=T.ACCENT, fg=T.BG_WHITE,
-                                font=T.FONT_BODY, relief=tk.FLAT,
-                                cursor="hand2", width=18)
-    open_output_btn.pack(anchor=tk.W, pady=(8, 0))
-    output_card.pack(fill=tk.X, pady=5)
 
     # ═══════════════════════════════════════════════════════════
     # SECTION 7: Log Tab - Output & Status
     # ═══════════════════════════════════════════════════════════
-    # Log section
-    log_card = Card(log_tab, title="Nhat Ky Xu Ly")
-    log_container = log_card.get_container()
-
-    log_area = TextArea(log_container, height=12, font=T.FONT_MONO)
-    log_area.widget.config(bg=T.BG_LOG, fg=T.FG_LOG,
-                           insertbackground=T.ACCENT)
-    log_area.pack(fill=tk.BOTH, expand=True)
-
-    log_card.pack(fill=tk.BOTH, expand=True, pady=5)
+    log_view_state = {}
+    log_view = LogView(notebook, log_view_state)
+    log_tab = log_view.build()
+    log_area = log_view_state['log_area']
     
     # Helper functions
     def paste_clipboard():
@@ -1357,32 +854,6 @@ def launch_gui():
 
     _write_app_log_line("=" * 72)
     _write_app_log_line("GUI session started")
-
-    preset_guard = {"applying": False}
-    preview_guard = {
-        "source": None,
-        "image": None,
-        "live_render": False,
-        "render_after_id": None,
-        "render_signature": None,
-        "kind": None,
-        "duration": 0.0,
-        "path": None,
-        "playing": False,
-        "after_id": None,
-        "updating_seek": False,
-        "drag_margin_start": 0,
-        "drag_offset_start": 0.0,
-        "drag_x_start": 0,
-        "drag_y_start": 0,
-        "drag_active": False,
-        "segments": [],
-        "selected_segment": None,
-        "over_preview": False,
-        "video_rect": (0, 0, 0, 0),
-        "subtitle_rect": (0, 0, 0, 0),
-        "render_meta": {},
-    }
 
     voice_guard = {
         "options": [],
@@ -2291,6 +1762,59 @@ def launch_gui():
             _adjust_font_size(-2)
         return "break"
 
+    # Build Adjust tab using AdjustView
+    adjust_view_state = {
+        'cover_mode_state': cover_mode_state,
+        'whisper_model_state': whisper_model_state,
+        'burn_sub_state': burn_sub_state,
+        'preset_state': preset_state,
+        'subtitle_offset_state': subtitle_offset_state,
+        'subtitle_scale_state': subtitle_scale_state,
+        'video_speed_state': video_speed_state,
+        'font_scale_state': font_scale_state,
+        'font_size_state': font_size_state,
+        'margin_state': margin_state,
+        'chars_per_line_state': chars_per_line_state,
+        'blur_padding_state': blur_padding_state,
+        'cover_offset_state': cover_offset_state,
+        'blur_power_state': blur_power_state,
+        'preview_text_state': preview_text_state,
+        'preview_time_state': preview_time_state,
+        'preview_guard': preview_guard,
+        'preset_guard': preset_guard,
+    }
+    adjust_view_callbacks = {
+        'mark_preset_custom': mark_preset_custom,
+        'apply_selected_preset': apply_selected_preset,
+        'update_preview': update_preview,
+        'log': log,
+    }
+    adjust_view = AdjustView(notebook, adjust_view_state, adjust_view_callbacks, HERE, SUBTITLE_PRESETS)
+    adjust_tab = adjust_view.build()
+    adjust_widgets = adjust_view.get_widgets()
+
+    # Add adjust tab to notebook
+    notebook.add(adjust_tab, text="  Can Chinh  ")
+
+    # Extract widget references from AdjustView
+    preview_canvas = adjust_widgets['preview_canvas']
+    preview_info_var = adjust_widgets['preview_info_var']
+    preview_status_var = adjust_widgets['preview_status_var']
+    preview_time_label_var = adjust_widgets['preview_time_label_var']
+    preview_seek = adjust_widgets['preview_seek']
+    preview_marker_canvas = adjust_widgets['preview_marker_canvas']
+    preview_text_box = adjust_widgets['preview_text_box']
+    preview_play_btn = adjust_widgets['preview_play_btn']
+    preview_refresh_btn = adjust_widgets['preview_refresh_btn']
+    preview_reset_pos_btn = adjust_widgets['preview_reset_pos_btn']
+    preview_reset_style_btn = adjust_widgets['preview_reset_style_btn']
+    last_output_var = adjust_widgets['last_output_var']
+    open_output_btn = adjust_widgets['open_output_btn']
+    adjust_left = adjust_widgets['adjust_left']
+
+    # Set initial value for last_output_var
+    last_output_var.set(app_config.get("last_render_dir", ""))
+
     for state in (cover_mode_state, subtitle_offset_state, subtitle_scale_state, font_scale_state, font_size_state, margin_state, chars_per_line_state, blur_padding_state, cover_offset_state, blur_power_state):
         state.trace(mark_preset_custom)
         state.trace(update_preview)
@@ -2320,7 +1844,6 @@ def launch_gui():
     preview_canvas.bind("<Enter>", lambda _e: preview_guard.__setitem__("over_preview", True))
     preview_canvas.bind("<Leave>", lambda _e: preview_guard.__setitem__("over_preview", False))
     preview_canvas.config(cursor="hand2")
-    _bind_scroll_recursive(adjust_left)
     notebook.bind("<<NotebookTabChanged>>", lambda e: load_source_preview(force=False) if notebook.tab(notebook.select(), "text") == "Căn Chỉnh" else None)
     sync_dub_mode()
     root.after(150, refresh_voice_list)

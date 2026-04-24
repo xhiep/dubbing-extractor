@@ -19,11 +19,12 @@ venv\Scripts\python.exe main.py
 - Dùng PowerShell để gọi: `powershell.exe -Command "& 'C:\Users\xhiep\Downloads\dubbing-extractor\bin\ffmpeg\ffmpeg.exe' ..."`
 
 ## Cấu trúc chính
-- `main.py` — entry point + toàn bộ GUI (Tkinter, ~2,522 dòng, organized with section markers)
+- `main.py` — entry point + window setup + application logic (~2,043 dòng)
+- `src/views/` — tab UI components (LogView, DubView, SourceView, AdjustView) - Phase 5
+- `src/controllers/` — event handlers (Phase 2 extraction)
 - `src/modules/workflow.py` — pipeline xử lý video (download → transcribe → translate → render, ~567 dòng)
 - `src/modules/tts/` — VieNeu-TTS lồng tiếng tiếng Việt
 - `src/components/` — custom UI components (Card, Button, Input, TextArea...)
-- `src/controllers/` — event handlers (Phase 2 extraction)
 - `src/utils/ui_helpers.py` — pure UI geometry helper functions (Phase 3 extraction)
 - `src/utils/logger.py` — structured logging with rotation (Phase 4)
 
@@ -57,6 +58,24 @@ Bước 7: Lồng tiếng VieNeu-TTS (optional)
 - Google-style docstrings cho tất cả public functions
 - Args, Returns, Raises sections đầy đủ
 - Context managers cho resource cleanup
+
+## View Extraction (Phase 5)
+
+**Views (src/views/):**
+- Extracted all tab UI code from main.py to separate view classes
+- Each view builds and returns a configured tk.Frame
+- Views are pure UI - no business logic
+
+**Architecture:**
+- main.py: Window setup + application logic (~2,043 lines)
+- Views: Tab UI structure (LogView, DubView, SourceView, AdjustView)
+- Controllers: Event handlers (thin wrappers)
+- Modules: Business logic (workflow, TTS, downloader)
+
+**Benefits:**
+- Complete MVC separation
+- Each tab is independently maintainable
+- UI code organized by feature
 
 ## Tính năng hiện tại
 

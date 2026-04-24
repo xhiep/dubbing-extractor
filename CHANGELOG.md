@@ -115,6 +115,38 @@ Major codebase cleanup and quality improvements across 4 phases.
 - Error visibility and debugging capability
 - Resource management and memory cleanup
 
+### Phase 5: Extract View Components (Final Refactor) - 2026-04-24
+
+#### Added
+- **Views Module** (`src/views/`)
+  - `LogView` - Log tab UI (~50 lines)
+  - `DubView` - Dub tab UI (~250 lines)
+  - `SourceView` - Source tab UI (~260 lines)
+  - `AdjustView` - Adjust tab UI with scroll setup (~420 lines)
+
+#### Changed
+- Extracted all 4 tab UI code from main.py to separate view classes
+- main.py: 2,522 → 2,043 lines (479 line reduction, 19% decrease)
+- Each view builds and returns a configured tk.Frame
+- Views are pure UI - no business logic
+
+#### Architecture
+- **Complete MVC separation achieved**
+  - Views: Pure UI structure (no business logic)
+  - Controllers: Event handlers (thin wrappers from Phase 2)
+  - Modules: Business logic (unchanged)
+- main.py now contains: window setup, state management, view assembly, application logic
+
+#### Files Modified
+- Created: `src/views/__init__.py`, `src/views/log_view.py`, `src/views/dub_view.py`, `src/views/source_view.py`, `src/views/adjust_view.py`
+- Modified: `main.py` (reduced by 479 lines)
+- Updated: `CLAUDE.md`, `CHANGELOG.md`
+
+#### Metrics
+- main.py: 2,522 → 2,043 lines (19% reduction)
+- Total lines extracted: ~980 lines to src/views/
+- Code organization: Complete MVC separation
+
 ## Summary of Refactoring
 
 ### Before Refactoring
@@ -125,7 +157,8 @@ Major codebase cleanup and quality improvements across 4 phases.
 - Logging: Print statements and callbacks only
 
 ### After Refactoring
-- main.py: ~2,522 lines (organized with section markers)
+- main.py: ~2,043 lines (organized with section markers + view assembly)
+- Views: 4 view classes for tab UI (LogView, DubView, SourceView, AdjustView)
 - Controllers: 4 controller classes for event handling
 - Utilities: ui_helpers.py, logger.py
 - Error handling: Consistent, specific exceptions, logged with context

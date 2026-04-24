@@ -549,22 +549,22 @@ def launch_gui():
 
 **All assumptions verified:** [VERIFIED: Examined main.py structure, existing controller pattern, component architecture]
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should helper functions (paste_clipboard, browse_file, etc.) move to views or stay in main.py?**
    - What we know: These functions are currently defined in launch_gui() scope (lines 1309-1348)
    - What's unclear: Whether they belong in views (closer to UI) or main.py (shared across views)
-   - Recommendation: Keep in main.py, pass as callbacks. They're shared across multiple views and access main.py state.
+   - **RESOLVED:** Keep in main.py, pass as callbacks. They're shared across multiple views and access main.py state.
 
 2. **How to handle the complex preview canvas in adjust_tab?**
    - What we know: Preview canvas has extensive event handlers, image rendering, segment markers (lines 1495-2479)
    - What's unclear: Whether to extract preview logic to separate class or keep in AdjustView
-   - Recommendation: Keep in AdjustView for Phase 5, consider extracting to PreviewCanvas class in future if needed.
+   - **RESOLVED:** Keep in AdjustView for Phase 5, consider extracting to PreviewCanvas class in future if needed.
 
 3. **Should step-by-step UI (lines 408-577) be extracted to separate StepView or stay in SourceView?**
    - What we know: Step-by-step UI is ~170 lines, tightly coupled to source tab
    - What's unclear: Whether it deserves its own view class
-   - Recommendation: Keep in SourceView for Phase 5. It's part of source tab functionality.
+   - **RESOLVED:** Keep in SourceView for Phase 5. It's part of source tab functionality.
 
 ## Environment Availability
 

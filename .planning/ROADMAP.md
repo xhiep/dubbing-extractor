@@ -294,6 +294,8 @@ Plans:
 
 **Risk Level**: MEDIUM - Di chuyển UI code, có thể break layout
 
+**Requirements**: None (refactoring phase - restructuring existing code)
+
 **Plans:** 5 plans
 
 Plans:
