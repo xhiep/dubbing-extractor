@@ -795,8 +795,8 @@ def launch_gui():
         'browse_ref_audio': None,  # Will be set by TtsController
         'log': None,  # Will be set after log_area is created
     }
-    dub_view = DubView(dub_tab, dub_view_state, dub_view_callbacks)
-    dub_tab_frame = dub_view.build()
+    dub_view = DubView(notebook, dub_view_state, dub_view_callbacks)
+    dub_tab = dub_view.build()
     dub_widgets = dub_view.get_widgets()
 
     # Extract individual widget references for backward compatibility
